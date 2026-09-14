@@ -69,7 +69,7 @@ export default async function HomePage() {
           <div className="relative hidden aspect-[4/5] lg:block">
             <div className="absolute inset-0 -right-2 top-0 h-[85%] w-[80%] overflow-hidden rounded-[28px] shadow-2xl shadow-ink/10">
               <FadeImage
-                src="https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f4/Man_with_smartphone_and_laptop_%28Unsplash%29.jpg/960px-Man_with_smartphone_and_laptop_%28Unsplash%29.jpg"
+                src="https://images.unsplash.com/photo-1555529669-2269763671c0?fm=jpg&q=80&w=1200&auto=format&fit=crop"
                 alt="Featured product styling"
                 fill
                 priority
