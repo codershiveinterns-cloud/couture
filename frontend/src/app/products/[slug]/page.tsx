@@ -9,6 +9,9 @@ import ProductCard from '@/components/ProductCard';
 import StarRating from '@/components/StarRating';
 import Reveal from '@/components/Reveal';
 
+// Live catalog data — render per-request, never at build time.
+export const dynamic = 'force-dynamic';
+
 export async function generateMetadata({ params }: PageProps<'/products/[slug]'>): Promise<Metadata> {
   const { slug } = await params;
   const product = await getProductBySlug(slug);

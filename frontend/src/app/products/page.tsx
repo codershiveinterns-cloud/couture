@@ -10,6 +10,9 @@ export const metadata: Metadata = {
   title: 'Shop All Products',
 };
 
+// Live catalog data — render per-request, never at build time.
+export const dynamic = 'force-dynamic';
+
 export default async function ProductsPage({ searchParams }: PageProps<'/products'>) {
   const sp = await searchParams;
   const page = Number(sp.page) || 1;

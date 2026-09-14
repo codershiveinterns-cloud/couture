@@ -5,6 +5,11 @@ import ProductCard from '@/components/ProductCard';
 import Reveal from '@/components/Reveal';
 import FadeImage from '@/components/FadeImage';
 
+// This page fetches live catalog data, so it must not be statically
+// prerendered at build time (the API isn't reachable during the Vercel
+// build) — render it per-request instead.
+export const dynamic = 'force-dynamic';
+
 export default async function HomePage() {
   const [categories, featured, popular] = await Promise.all([
     getCategories(),

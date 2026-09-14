@@ -8,6 +8,9 @@ import SortSelect from '@/components/SortSelect';
 import Reveal from '@/components/Reveal';
 import FadeImage from '@/components/FadeImage';
 
+// Live catalog data — render per-request, never at build time.
+export const dynamic = 'force-dynamic';
+
 export async function generateMetadata({ params }: PageProps<'/categories/[slug]'>): Promise<Metadata> {
   const { slug } = await params;
   const category = await getCategoryBySlug(slug);
