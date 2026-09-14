@@ -79,7 +79,7 @@ export default async function HomePage() {
             </div>
             <div className="absolute bottom-0 right-0 h-[48%] w-[46%] overflow-hidden rounded-[22px] border-4 border-canvas shadow-2xl shadow-ink/15">
               <FadeImage
-                src="https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cc/Black_smartphone_in_hand_%28Unsplash%29.jpg/960px-Black_smartphone_in_hand_%28Unsplash%29.jpg"
+                src="https://images.unsplash.com/photo-1561715276-a2d087060f1d?fm=jpg&q=80&w=1200&auto=format&fit=crop"
                 alt="Product detail"
                 fill
                 sizes="25vw"
