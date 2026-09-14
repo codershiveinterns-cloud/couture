@@ -2,15 +2,18 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CategorySummary } from '@/lib/types';
 
 export default function Header({ categories }: { categories: CategorySummary[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [scrolled, setScrolled] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -18,6 +21,31 @@ export default function Header({ categories }: { categories: CategorySummary[] }
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  useEffect(() => {
+    const onClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setCategoriesOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setCategoriesOpen(false);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, []);
+
+  const openDropdown = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setCategoriesOpen(true);
+  };
+  const scheduleClose = () => {
+    closeTimer.current = setTimeout(() => setCategoriesOpen(false), 150);
+  };
 
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -28,10 +56,12 @@ export default function Header({ categories }: { categories: CategorySummary[] }
 
   const navLinkClass = (href: string) => {
     const isActive = href === '/' ? pathname === '/' : pathname.startsWith(href);
-    return `relative py-1 transition-colors hover:text-brand ${isActive ? 'text-ink' : 'text-ink/60'} after:absolute after:-bottom-1 after:left-0 after:h-[1.5px] after:rounded-full after:bg-brand after:transition-all after:duration-300 ${
+    return `relative whitespace-nowrap py-1 transition-colors hover:text-brand ${isActive ? 'text-ink' : 'text-ink/60'} after:absolute after:-bottom-1 after:left-0 after:h-[1.5px] after:rounded-full after:bg-brand after:transition-all after:duration-300 ${
       isActive ? 'after:w-full' : 'after:w-0'
     }`;
   };
+
+  const inCategories = pathname.startsWith('/categories');
 
   return (
     <header
@@ -66,18 +96,64 @@ export default function Header({ categories }: { categories: CategorySummary[] }
           <span className="font-display text-lg font-semibold tracking-tight text-ink">Shoply</span>
         </Link>
 
-        <nav className="hidden items-center gap-6 font-display text-[15px] font-medium lg:flex">
+        <nav className="hidden items-center gap-7 font-display text-[15px] font-medium lg:flex">
           <Link href="/" className={navLinkClass('/')}>
             Home
           </Link>
           <Link href="/products" className={navLinkClass('/products')}>
             Shop All
           </Link>
-          {categories.slice(0, 5).map((cat) => (
-            <Link key={cat.id} href={`/categories/${cat.slug}`} className={navLinkClass(`/categories/${cat.slug}`)}>
-              {cat.name}
-            </Link>
-          ))}
+
+          <div
+            ref={dropdownRef}
+            className="relative"
+            onMouseEnter={openDropdown}
+            onMouseLeave={scheduleClose}
+          >
+            <button
+              type="button"
+              onClick={() => setCategoriesOpen((v) => !v)}
+              aria-expanded={categoriesOpen}
+              className={`relative flex items-center gap-1.5 whitespace-nowrap py-1 transition-colors hover:text-brand ${
+                inCategories ? 'text-ink' : 'text-ink/60'
+              }`}
+            >
+              Categories
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                className={`transition-transform duration-200 ${categoriesOpen ? 'rotate-180' : ''}`}
+              >
+                <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+
+            <div
+              className={`absolute left-1/2 top-full z-50 w-64 -translate-x-1/2 pt-3 transition-all duration-200 ${
+                categoriesOpen ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-1 opacity-0'
+              }`}
+            >
+              <div className="overflow-hidden rounded-2xl border border-ink/8 bg-white p-2 shadow-xl shadow-ink/10">
+                {categories.map((cat) => (
+                  <Link
+                    key={cat.id}
+                    href={`/categories/${cat.slug}`}
+                    onClick={() => setCategoriesOpen(false)}
+                    className="flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium text-ink/75 transition-colors hover:bg-brand-light hover:text-brand"
+                  >
+                    {cat.name}
+                    {typeof cat.productCount === 'number' && (
+                      <span className="text-xs text-ink/35">{cat.productCount}</span>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
         </nav>
 
         <form onSubmit={handleSearch} className="ml-auto hidden flex-1 max-w-md sm:flex">
@@ -141,16 +217,21 @@ export default function Header({ categories }: { categories: CategorySummary[] }
             <Link href="/products" onClick={() => setMenuOpen(false)} className="transition-colors hover:text-brand">
               Shop All
             </Link>
-            {categories.map((cat) => (
-              <Link
-                key={cat.id}
-                href={`/categories/${cat.slug}`}
-                onClick={() => setMenuOpen(false)}
-                className="transition-colors hover:text-brand"
-              >
-                {cat.name}
-              </Link>
-            ))}
+            <div className="mt-1 border-t border-ink/8 pt-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-ink/35">Categories</p>
+              <div className="flex flex-col gap-3">
+                {categories.map((cat) => (
+                  <Link
+                    key={cat.id}
+                    href={`/categories/${cat.slug}`}
+                    onClick={() => setMenuOpen(false)}
+                    className="transition-colors hover:text-brand"
+                  >
+                    {cat.name}
+                  </Link>
+                ))}
+              </div>
+            </div>
           </nav>
         </div>
       </div>

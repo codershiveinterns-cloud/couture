@@ -5,39 +5,37 @@ const prisma = new PrismaClient();
 
 const slug = (s) => slugify(s, { lower: true, strict: true });
 
-// Deterministic placeholder images (picsum.photos supports a fixed "seed" so
-// the same product always renders the same picture across reloads).
-const img = (seed, w = 800, h = 800) => `https://picsum.photos/seed/${seed}/${w}/${h}`;
+// Real product photography, pre-fetched from Wikimedia Commons (freely
+// licensed, stable CDN) by scripts/fetch-product-images.js — see that
+// script for how these were selected and vetted for relevance. Re-run it
+// to refresh/expand this file.
+const IMAGES = require('./product-images.json');
 
 const CATEGORIES = [
   {
     name: 'Electronics',
     description: 'Phones, laptops, audio, and everyday tech.',
-    image: img('cat-electronics', 800, 500),
   },
   {
     name: 'Fashion',
     description: "Men's and women's apparel, footwear, and accessories.",
-    image: img('cat-fashion', 800, 500),
   },
   {
     name: 'Home & Kitchen',
     description: 'Furniture, cookware, and everyday home essentials.',
-    image: img('cat-home', 800, 500),
   },
   {
     name: 'Beauty & Personal Care',
     description: 'Skincare, haircare, and grooming products.',
-    image: img('cat-beauty', 800, 500),
   },
   {
     name: 'Sports & Outdoors',
     description: 'Fitness gear, outdoor equipment, and activewear.',
-    image: img('cat-sports', 800, 500),
   },
 ];
 
-// productCount / images / variant flag configured per category
+// productCount / images / variant flag configured per category. Each
+// product's real photos are looked up from IMAGES.products by its slug.
 const PRODUCTS_BY_CATEGORY = {
   Electronics: [
     { name: 'Aurora Wireless Headphones', price: 89.99, compareAtPrice: 109.99, brand: 'Aurora', variants: 'color' },
@@ -102,12 +100,16 @@ async function main() {
   let skuCounter = 1000;
 
   for (const cat of CATEGORIES) {
+    const catSlug = slug(cat.name);
+    const catImages = IMAGES.categories[catSlug] || [];
+    if (catImages.length === 0) console.warn(`No fetched image for category "${cat.name}"`);
+
     const category = await prisma.category.create({
       data: {
         name: cat.name,
-        slug: slug(cat.name),
+        slug: catSlug,
         description: cat.description,
-        imageUrl: cat.image,
+        imageUrl: catImages[0]?.url || null,
         sortOrder: categorySort++,
       },
     });
@@ -121,6 +123,9 @@ async function main() {
       const sku = `SKU-${skuCounter}`;
       const isFeatured = featuredPicked < 2;
       featuredPicked++;
+
+      const productImages = IMAGES.products[productSlug] || [];
+      if (productImages.length === 0) console.warn(`No fetched images for product "${p.name}"`);
 
       const product = await prisma.product.create({
         data: {
@@ -138,8 +143,8 @@ async function main() {
           reviewCount: Math.floor(Math.random() * 120),
           categoryId: category.id,
           images: {
-            create: [0, 1, 2].map((i) => ({
-              url: img(`${productSlug}-${i}`),
+            create: productImages.map((im, i) => ({
+              url: im.url,
               altText: `${p.name} — image ${i + 1}`,
               sortOrder: i,
             })),

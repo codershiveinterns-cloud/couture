@@ -79,9 +79,8 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-14 flex flex-col items-center justify-between gap-3 border-t border-white/10 pt-6 text-xs text-white/40 sm:flex-row">
+        <div className="mt-14 border-t border-white/10 pt-6 text-center text-xs text-white/40">
           <p>&copy; {new Date().getFullYear()} Shoply. All rights reserved.</p>
-          <p>Built with Next.js &middot; Node.js &middot; PostgreSQL</p>
         </div>
       </div>
     </footer>
