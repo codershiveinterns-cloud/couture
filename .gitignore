@@ -11,12 +11,15 @@ node_modules/
 .env*.local
 
 # Next.js
-frontend/.next/
-frontend/out/
+.next/
+out/
+build/
 
 # Logs
 *.log
 npm-debug.log*
 
-# OS
+# OS & Editor
 .DS_Store
+.claude/
+
