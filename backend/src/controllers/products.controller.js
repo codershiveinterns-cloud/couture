@@ -53,7 +53,7 @@ const listProducts = asyncHandler(async (req, res) => {
       take,
       include: {
         category: true,
-        images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+        images: { orderBy: { sortOrder: "asc" }, take: 2 },
       },
     }),
     prisma.product.count({ where }),
@@ -107,7 +107,7 @@ const getRelatedProducts = asyncHandler(async (req, res) => {
     orderBy: { createdAt: 'desc' },
     include: {
       category: true,
-      images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+      images: { orderBy: { sortOrder: "asc" }, take: 2 },
     },
   });
 

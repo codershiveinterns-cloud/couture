@@ -27,6 +27,7 @@ const serializeProductSummary = (product) => ({
     ? { id: product.category.id, name: product.category.name, slug: product.category.slug }
     : undefined,
   image: product.images?.[0]?.url ?? null,
+  hoverImage: product.images?.[1]?.url ?? null,
 });
 
 const serializeProductDetail = (product) => ({

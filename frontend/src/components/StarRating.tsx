@@ -18,7 +18,7 @@ export default function StarRating({
           const half = !filled && i + 0.5 === rounded;
           return (
             <span key={i} className="relative inline-block">
-              <span className="text-slate-200">★</span>
+              <span className="text-ink/15">★</span>
               {(filled || half) && (
                 <span
                   className="absolute inset-0 overflow-hidden text-amber-400"
@@ -32,7 +32,7 @@ export default function StarRating({
         })}
       </div>
       {typeof reviewCount === 'number' && (
-        <span className="text-xs text-slate-500">({reviewCount})</span>
+        <span className="text-xs text-ink/45">({reviewCount})</span>
       )}
     </div>
   );

@@ -23,7 +23,7 @@ export default function SortSelect({ basePath, current }: { basePath: string; cu
 
   return (
     <div className="flex items-center gap-2 text-sm">
-      <label htmlFor="sort" className="text-slate-500">
+      <label htmlFor="sort" className="text-ink/45">
         Sort by
       </label>
       <select
@@ -31,7 +31,7 @@ export default function SortSelect({ basePath, current }: { basePath: string; cu
         name="sort"
         defaultValue={current || 'newest'}
         onChange={handleChange}
-        className="cursor-pointer rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none transition-colors hover:border-slate-400 focus:border-brand focus:ring-2 focus:ring-brand/20"
+        className="cursor-pointer rounded-full border border-ink/12 bg-white px-3.5 py-1.5 text-sm font-medium outline-none transition-colors hover:border-ink/25 focus:border-brand focus:ring-4 focus:ring-brand/10"
       >
         {SORT_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>

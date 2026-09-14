@@ -3,8 +3,8 @@
 export default function Error({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
     <div className="mx-auto flex max-w-lg flex-col items-center px-4 py-24 text-center">
-      <h1 className="text-xl font-semibold text-slate-900">Something went wrong</h1>
-      <p className="mt-2 text-sm text-slate-500">
+      <h1 className="text-xl font-semibold text-ink">Something went wrong</h1>
+      <p className="mt-2 text-sm text-ink/50">
         We couldn&rsquo;t load this page. Make sure the API server is running, then try again.
       </p>
       <button

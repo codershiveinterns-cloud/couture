@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { CategorySummary } from '@/lib/types';
 
 export default function Header({ categories }: { categories: CategorySummary[] }) {
@@ -10,6 +10,14 @@ export default function Header({ categories }: { categories: CategorySummary[] }
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -20,17 +28,25 @@ export default function Header({ categories }: { categories: CategorySummary[] }
 
   const navLinkClass = (href: string) => {
     const isActive = href === '/' ? pathname === '/' : pathname.startsWith(href);
-    return `relative py-1 transition-colors hover:text-brand ${isActive ? 'text-slate-900' : ''} after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:rounded-full after:bg-brand after:transition-all after:duration-200 ${
+    return `relative py-1 transition-colors hover:text-brand ${isActive ? 'text-ink' : 'text-ink/60'} after:absolute after:-bottom-1 after:left-0 after:h-[1.5px] after:rounded-full after:bg-brand after:transition-all after:duration-300 ${
       isActive ? 'after:w-full' : 'after:w-0'
     }`;
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
+    <header
+      className={`sticky top-0 z-50 border-b bg-canvas/90 backdrop-blur-md transition-shadow duration-300 ${
+        scrolled ? 'border-ink/10 shadow-[0_1px_0_0_rgba(0,0,0,0.04),0_8px_24px_-16px_rgba(0,0,0,0.15)]' : 'border-transparent'
+      }`}
+    >
+      <div
+        className={`mx-auto flex max-w-7xl items-center gap-4 px-4 transition-[padding] duration-300 sm:px-6 lg:px-8 ${
+          scrolled ? 'py-2.5' : 'py-4'
+        }`}
+      >
         <button
           type="button"
-          className="-ml-1 flex h-9 w-9 items-center justify-center rounded-md text-slate-700 transition-colors hover:bg-slate-100 lg:hidden"
+          className="-ml-1 flex h-9 w-9 items-center justify-center rounded-md text-ink transition-colors hover:bg-ink/5 lg:hidden"
           aria-label="Toggle menu"
           onClick={() => setMenuOpen((v) => !v)}
         >
@@ -43,11 +59,14 @@ export default function Header({ categories }: { categories: CategorySummary[] }
           </svg>
         </button>
 
-        <Link href="/" className="shrink-0 text-xl font-bold tracking-tight text-slate-900 transition-colors hover:text-brand">
-          Shoply
+        <Link href="/" className="group flex shrink-0 items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink text-sm font-bold text-white transition-transform duration-300 group-hover:-rotate-6 group-hover:bg-brand">
+            S
+          </span>
+          <span className="font-display text-lg font-semibold tracking-tight text-ink">Shoply</span>
         </Link>
 
-        <nav className="hidden items-center gap-6 text-sm font-medium text-slate-600 lg:flex">
+        <nav className="hidden items-center gap-6 font-display text-[15px] font-medium lg:flex">
           <Link href="/" className={navLinkClass('/')}>
             Home
           </Link>
@@ -68,12 +87,12 @@ export default function Header({ categories }: { categories: CategorySummary[] }
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search products, brands, SKUs..."
-              className="w-full rounded-full border border-slate-300 bg-slate-50 py-2 pl-4 pr-10 text-sm outline-none transition-all duration-150 focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand/15"
+              className="w-full rounded-full border border-ink/10 bg-white py-2 pl-4 pr-10 text-sm outline-none transition-all duration-150 placeholder:text-ink/35 focus:border-brand focus:ring-4 focus:ring-brand/10"
             />
             <button
               type="submit"
               aria-label="Search"
-              className="absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-brand-light hover:text-brand"
+              className="absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-ink/50 transition-colors hover:bg-brand-light hover:text-brand"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="7" />
@@ -101,7 +120,7 @@ export default function Header({ categories }: { categories: CategorySummary[] }
       </div>
 
       <div
-        className={`grid overflow-hidden border-slate-200 transition-all duration-300 ease-out lg:hidden ${
+        className={`grid overflow-hidden border-ink/10 transition-all duration-300 ease-out lg:hidden ${
           menuOpen ? 'grid-rows-[1fr] border-t opacity-100' : 'grid-rows-[0fr] border-t-0 opacity-0'
         }`}
       >
@@ -112,10 +131,10 @@ export default function Header({ categories }: { categories: CategorySummary[] }
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search products..."
-              className="w-full rounded-full border border-slate-300 bg-slate-50 px-4 py-2 text-sm outline-none transition-all focus:border-brand focus:ring-2 focus:ring-brand/15"
+              className="w-full rounded-full border border-ink/10 bg-white px-4 py-2 text-sm outline-none transition-all focus:border-brand focus:ring-4 focus:ring-brand/10"
             />
           </form>
-          <nav className="flex flex-col gap-3 text-sm font-medium text-slate-700">
+          <nav className="flex flex-col gap-3 font-display text-sm font-medium text-ink/70">
             <Link href="/" onClick={() => setMenuOpen(false)} className="transition-colors hover:text-brand">
               Home
             </Link>
@@ -144,7 +163,7 @@ function IconButton({ label, children }: { label: string; children: React.ReactN
     <button
       type="button"
       title={`${label} — coming in Milestone 2`}
-      className="flex h-9 w-9 items-center justify-center rounded-full text-slate-600 transition-all duration-150 hover:bg-brand-light hover:text-brand active:scale-90"
+      className="flex h-9 w-9 items-center justify-center rounded-full text-ink/70 transition-all duration-150 hover:bg-brand-light hover:text-brand active:scale-90"
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
         {children}

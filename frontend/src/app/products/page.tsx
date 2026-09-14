@@ -4,6 +4,7 @@ import { getCategories, getProducts, type ProductQuery } from '@/lib/api';
 import ProductCard from '@/components/ProductCard';
 import Pagination from '@/components/Pagination';
 import SortSelect from '@/components/SortSelect';
+import Reveal from '@/components/Reveal';
 
 export const metadata: Metadata = {
   title: 'Shop All Products',
@@ -26,21 +27,21 @@ export default async function ProductsPage({ searchParams }: PageProps<'/product
 
   return (
     <div className="mx-auto max-w-7xl animate-fade-in-up px-4 py-10 sm:px-6 lg:px-8">
-      <div className="mb-2 text-sm text-slate-500">
+      <div className="mb-2 text-sm text-ink/45">
         <Link href="/" className="transition-colors hover:text-brand">
           Home
         </Link>{' '}
-        / <span className="text-slate-700">Shop</span>
-        {activeCategory && <span className="text-slate-700"> / {activeCategory.name}</span>}
+        / <span className="text-ink/70">Shop</span>
+        {activeCategory && <span className="text-ink/70"> / {activeCategory.name}</span>}
       </div>
 
-      <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+      <h1 className="font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
         {q ? `Search results for "${q}"` : activeCategory ? activeCategory.name : 'All Products'}
       </h1>
-      <p className="mt-1 text-sm text-slate-500">{result.meta?.total ?? 0} products</p>
+      <p className="mt-1.5 text-sm text-ink/50">{result.meta?.total ?? 0} products</p>
 
       {/* Category filter chips */}
-      <div className="mt-5 flex flex-wrap gap-2">
+      <div className="mt-6 flex flex-wrap gap-2">
         <FilterChip href="/products" active={!category}>
           All
         </FilterChip>
@@ -51,20 +52,20 @@ export default async function ProductsPage({ searchParams }: PageProps<'/product
         ))}
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
-        <span className="text-sm text-slate-500">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-b border-ink/10 pb-4">
+        <span className="text-sm text-ink/45">
           {result.meta ? `Page ${result.meta.page} of ${result.meta.totalPages}` : null}
         </span>
         <SortSelect basePath="/products" current={sort} />
       </div>
 
       {result.data.length === 0 ? (
-        <div className="py-20 text-center text-slate-500">
-          <p className="text-lg font-medium text-slate-700">No products found</p>
+        <div className="py-24 text-center text-ink/50">
+          <p className="font-display text-lg font-medium text-ink">No products found</p>
           <p className="mt-1 text-sm">Try a different search term or browse all products.</p>
           <Link
             href="/products"
-            className="mt-4 inline-block rounded-full bg-brand px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-dark"
+            className="mt-5 inline-block rounded-full bg-ink px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand"
           >
             View All Products
           </Link>
@@ -72,9 +73,9 @@ export default async function ProductsPage({ searchParams }: PageProps<'/product
       ) : (
         <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {result.data.map((product, idx) => (
-            <div key={product.id} className="animate-fade-in-up" style={{ animationDelay: `${Math.min(idx, 8) * 40}ms` }}>
+            <Reveal key={product.id} delay={Math.min(idx, 8) * 40}>
               <ProductCard product={product} />
-            </div>
+            </Reveal>
           ))}
         </div>
       )}
@@ -102,10 +103,10 @@ function FilterChip({
   return (
     <Link
       href={href}
-      className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors duration-200 ${
+      className={`rounded-full border px-4 py-2 text-sm font-medium transition-all duration-200 ${
         active
-          ? 'border-brand bg-brand text-white'
-          : 'border-slate-300 text-slate-600 hover:border-brand/50 hover:text-brand'
+          ? 'border-ink bg-ink text-white shadow-sm'
+          : 'border-ink/12 text-ink/60 hover:border-brand/40 hover:text-brand'
       }`}
     >
       {children}

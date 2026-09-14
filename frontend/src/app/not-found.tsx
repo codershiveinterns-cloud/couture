@@ -3,9 +3,9 @@ import Link from 'next/link';
 export default function NotFound() {
   return (
     <div className="mx-auto flex max-w-lg flex-col items-center px-4 py-24 text-center">
-      <span className="text-6xl font-bold text-slate-200">404</span>
-      <h1 className="mt-4 text-xl font-semibold text-slate-900">Page not found</h1>
-      <p className="mt-2 text-sm text-slate-500">
+      <span className="text-6xl font-bold text-ink/15">404</span>
+      <h1 className="mt-4 text-xl font-semibold text-ink">Page not found</h1>
+      <p className="mt-2 text-sm text-ink/50">
         The page you&rsquo;re looking for doesn&rsquo;t exist or may have been moved.
       </p>
       <Link

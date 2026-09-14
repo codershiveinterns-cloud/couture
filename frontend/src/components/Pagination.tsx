@@ -37,13 +37,11 @@ export default function Pagination({
         const showEllipsis = prevPage && page - prevPage > 1;
         return (
           <span key={page} className="flex items-center gap-1">
-            {showEllipsis && <span className="px-1 text-slate-400">&hellip;</span>}
+            {showEllipsis && <span className="px-1 text-ink/30">&hellip;</span>}
             <Link
               href={buildHref(page)}
-              className={`flex h-9 min-w-9 items-center justify-center rounded-md px-2 text-sm font-medium transition-colors duration-150 ${
-                page === meta.page
-                  ? 'bg-brand text-white'
-                  : 'text-slate-700 hover:bg-slate-100'
+              className={`flex h-9 min-w-9 items-center justify-center rounded-full px-2 text-sm font-medium transition-colors duration-150 ${
+                page === meta.page ? 'bg-ink text-white shadow-sm' : 'text-ink/60 hover:bg-ink/5'
               }`}
             >
               {page}
@@ -70,7 +68,7 @@ function PageLink({
 }) {
   if (disabled) {
     return (
-      <span className="flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium text-slate-300">
+      <span className="flex h-9 items-center justify-center rounded-full px-3 text-sm font-medium text-ink/25">
         {children}
       </span>
     );
@@ -78,7 +76,7 @@ function PageLink({
   return (
     <Link
       href={href}
-      className="flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium text-slate-700 transition-colors duration-150 hover:bg-slate-100 hover:text-brand"
+      className="flex h-9 items-center justify-center rounded-full px-3 text-sm font-medium text-ink/60 transition-colors duration-150 hover:bg-ink/5 hover:text-brand"
     >
       {children}
     </Link>

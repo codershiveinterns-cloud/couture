@@ -19,6 +19,7 @@ export interface ProductSummary {
   isFeatured: boolean;
   category?: { id: string; name: string; slug: string };
   image: string | null;
+  hoverImage: string | null;
 }
 
 export interface ProductImage {
