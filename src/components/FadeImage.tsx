@@ -3,9 +3,8 @@
 import Image, { type ImageProps } from 'next/image';
 import { useState } from 'react';
 
-// Thin wrapper around next/image that fades the image in once it has
-// actually loaded, instead of popping in abruptly (or sitting on a flat
-// gray box while picsum.photos responds).
+// Fades the image in once loaded instead of popping in abruptly while
+// Wikimedia Commons / Unsplash responds.
 export default function FadeImage({ className, alt, ...rest }: ImageProps) {
   const [loaded, setLoaded] = useState(false);
 

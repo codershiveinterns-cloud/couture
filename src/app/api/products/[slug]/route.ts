@@ -12,7 +12,7 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 });
     }
     return NextResponse.json({ success: true, data: product });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: 'Failed to fetch product' },
       { status: 500 }

@@ -2,18 +2,31 @@ import Link from 'next/link';
 
 export default function NotFound() {
   return (
-    <div className="mx-auto flex max-w-lg flex-col items-center px-4 py-24 text-center">
-      <span className="text-6xl font-bold text-ink/15">404</span>
-      <h1 className="mt-4 text-xl font-semibold text-ink">Page not found</h1>
-      <p className="mt-2 text-sm text-ink/50">
-        The page you&rsquo;re looking for doesn&rsquo;t exist or may have been moved.
-      </p>
-      <Link
-        href="/"
-        className="mt-6 rounded-full bg-brand px-6 py-2.5 text-sm font-medium text-white transition-all duration-150 hover:bg-brand-dark active:scale-95"
+    <div className="mx-auto flex max-w-xl flex-col items-center px-4 py-20 text-center sm:py-28">
+      <span
+        aria-hidden="true"
+        className="animate-fade-in-up bg-gradient-to-r from-brand to-discount bg-clip-text text-[96px] font-extrabold leading-none tracking-tight text-transparent sm:text-[128px]"
       >
-        Back to Home
-      </Link>
+        404
+      </span>
+      <h1 className="mt-6 text-[22px] font-bold uppercase tracking-[0.15em] text-ink sm:text-[26px]">We couldn&rsquo;t find that page</h1>
+      <p className="mt-3 max-w-md text-[14px] leading-6 text-ink-3">
+        The link may be broken or the page may have moved. Head back home or keep browsing the full catalogue.
+      </p>
+      <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+        <Link
+          href="/"
+          className="inline-flex h-12 items-center justify-center rounded-sm bg-brand px-8 text-[14px] font-bold uppercase tracking-wide text-white transition-colors duration-150 hover:bg-brand-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2"
+        >
+          Back to home
+        </Link>
+        <Link
+          href="/products"
+          className="inline-flex h-12 items-center justify-center rounded-sm border border-line-strong bg-white px-8 text-[14px] font-bold uppercase tracking-wide text-ink transition-colors duration-150 hover:border-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2"
+        >
+          Shop all
+        </Link>
+      </div>
     </div>
   );
 }

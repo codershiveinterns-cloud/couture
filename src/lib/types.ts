@@ -17,6 +17,7 @@ export interface ProductSummary {
   avgRating: number;
   reviewCount: number;
   isFeatured: boolean;
+  brand: string | null;
   category?: { id: string; name: string; slug: string };
   image: string | null;
   hoverImage: string | null;
@@ -75,4 +76,43 @@ export interface ApiListResponse<T> {
 export interface ApiItemResponse<T> {
   success: boolean;
   data: T;
+}
+
+export type ProductSort = 'newest' | 'price_asc' | 'price_desc' | 'rating' | 'popularity';
+
+export interface FacetOption {
+  value: string;
+  count: number;
+}
+
+export interface ProductFacets {
+  brands: FacetOption[];
+  colors: FacetOption[];
+  sizes: FacetOption[];
+  priceMin: number;
+  priceMax: number;
+  inStockCount: number;
+  total: number;
+}
+
+export interface ResolvedProductQuery {
+  q: string;
+  category: string | null;
+  featured: boolean;
+  brands: string[];
+  minPrice: number | null;
+  maxPrice: number | null;
+  minRating: number | null;
+  inStock: boolean;
+  colors: string[];
+  sizes: string[];
+  sort: ProductSort;
+  page: number;
+  pageSize: number;
+}
+
+export interface ProductSearchResult extends ApiListResponse<ProductSummary> {
+  meta: PaginationMeta;
+  facets: ProductFacets;
+  query: ResolvedProductQuery;
 }

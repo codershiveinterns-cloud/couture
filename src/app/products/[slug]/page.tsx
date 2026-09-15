@@ -2,14 +2,12 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getProductBySlug, getRelatedProducts } from '@/lib/api';
-import { formatPrice } from '@/lib/format';
 import ProductGallery from '@/components/ProductGallery';
 import ProductActions from '@/components/ProductActions';
 import ProductCard from '@/components/ProductCard';
-import StarRating from '@/components/StarRating';
-import Reveal from '@/components/Reveal';
+import SimilarRail from './SimilarRail';
 
-// Live catalog data — render per-request, never at build time.
+// Render per-request so catalog changes show without a rebuild.
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: PageProps<'/products/[slug]'>): Promise<Metadata> {
@@ -22,12 +20,6 @@ export async function generateMetadata({ params }: PageProps<'/products/[slug]'>
   };
 }
 
-const TRUST_BADGES = [
-  { icon: '🚚', label: 'Free shipping over $50' },
-  { icon: '↩️', label: '30-day easy returns' },
-  { icon: '🔒', label: 'Secure checkout' },
-];
-
 export default async function ProductDetailPage({ params }: PageProps<'/products/[slug]'>) {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
@@ -35,92 +27,120 @@ export default async function ProductDetailPage({ params }: PageProps<'/products
   if (!product) notFound();
 
   const related = await getRelatedProducts(slug);
-  const hasDiscount = product.compareAtPrice !== null && product.compareAtPrice > product.price;
+  const brandLabel = product.brand || product.category?.name || 'Couture';
 
   return (
-    <div className="mx-auto max-w-7xl animate-fade-in-up px-4 py-10 sm:px-6 lg:px-8">
-      <div className="mb-6 text-sm text-ink/45">
-        <Link href="/" className="transition-colors hover:text-brand">
-          Home
-        </Link>{' '}
-        /{' '}
-        {product.category && (
-          <>
-            <Link href={`/categories/${product.category.slug}`} className="transition-colors hover:text-brand">
-              {product.category.name}
-            </Link>{' '}
-            /{' '}
-          </>
-        )}
-        <span className="text-ink/70">{product.name}</span>
-      </div>
-
-      <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:items-start lg:gap-14">
-        <div className="lg:sticky lg:top-24">
-          <ProductGallery images={product.images} name={product.name} />
-        </div>
-
-        <div>
-          {product.brand && (
-            <span className="text-xs font-semibold uppercase tracking-widest text-brand">{product.brand}</span>
+    <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+      <nav aria-label="Breadcrumb" className="mb-5 text-[14px] text-ink-2">
+        <ol className="flex flex-wrap items-center gap-1.5">
+          <li>
+            <Link href="/" className="transition-colors hover:text-ink">
+              Home
+            </Link>
+          </li>
+          <li aria-hidden="true">/</li>
+          <li>
+            <Link href="/products" className="transition-colors hover:text-ink">
+              Shop
+            </Link>
+          </li>
+          {product.category && (
+            <>
+              <li aria-hidden="true">/</li>
+              <li>
+                <Link href={`/categories/${product.category.slug}`} className="transition-colors hover:text-ink">
+                  {product.category.name}
+                </Link>
+              </li>
+            </>
           )}
-          <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
+          <li aria-hidden="true">/</li>
+          <li className="font-bold text-ink" aria-current="page">
             {product.name}
-          </h1>
+          </li>
+        </ol>
+      </nav>
 
-          <div className="mt-3 flex items-center gap-3">
-            <StarRating rating={product.avgRating} reviewCount={product.reviewCount} size="md" />
-            <span className="text-sm text-ink/40">SKU: {product.sku}</span>
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start lg:gap-12">
+        <ProductGallery images={product.images} name={product.name} />
+
+        <div className="lg:sticky lg:top-24">
+          <h1 className="text-[24px] font-bold leading-tight text-ink">{brandLabel}</h1>
+          <p className="mt-1 text-[20px] leading-snug text-ink-2">{product.name}</p>
+
+          <span className="mt-3.5 inline-flex items-center gap-2 rounded-sm border border-line px-2.5 py-1.5 text-[14px] font-bold text-ink">
+            <span className="flex items-center gap-1">
+              {product.avgRating.toFixed(1)}
+              <span className="text-rating" aria-hidden="true">
+                ★
+              </span>
+            </span>
+            <span className="text-ink-4" aria-hidden="true">
+              |
+            </span>
+            <span className="font-normal text-ink-3">
+              {product.reviewCount} {product.reviewCount === 1 ? 'Rating' : 'Ratings'}
+            </span>
+          </span>
+
+          <div className="mt-5 border-t border-line pt-5">
+            <ProductActions
+              basePrice={product.price}
+              compareAtPrice={product.compareAtPrice}
+              stock={product.stock}
+              variants={product.variants}
+            />
           </div>
 
-          {hasDiscount && (
-            <div className="mt-4 flex items-center gap-2">
-              <span className="text-sm text-ink/40 line-through">
-                {formatPrice(product.compareAtPrice as number)}
-              </span>
-              <span className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-600">
-                Save {formatPrice((product.compareAtPrice as number) - product.price)}
-              </span>
-            </div>
-          )}
-
-          {product.shortDescription && (
-            <p className="mt-5 text-[15px] leading-relaxed text-ink/60">{product.shortDescription}</p>
-          )}
-
-          <div className="mt-7 border-t border-ink/10 pt-7">
-            <ProductActions basePrice={product.price} stock={product.stock} variants={product.variants} />
-          </div>
-
-          <div className="mt-8 grid grid-cols-1 gap-3 rounded-2xl border border-ink/8 bg-white p-4 sm:grid-cols-3 sm:gap-0 sm:divide-x sm:divide-ink/8">
-            {TRUST_BADGES.map((b) => (
-              <div key={b.label} className="flex items-center gap-2.5 px-1 sm:justify-center sm:px-3">
-                <span className="text-lg">{b.icon}</span>
-                <span className="text-xs font-medium text-ink/60">{b.label}</span>
+          <section aria-labelledby="product-details-heading" className="mt-6 border-t border-line pt-6">
+            <h2 id="product-details-heading" className="text-[16px] font-bold uppercase tracking-wide text-ink">
+              Product details
+            </h2>
+            {product.shortDescription && <p className="mt-3 text-[14px] font-bold text-ink-2">{product.shortDescription}</p>}
+            <p className="mt-2 whitespace-pre-line text-[14px] leading-relaxed text-ink-2">{product.description}</p>
+            <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 text-[14px]">
+              <div>
+                <dt className="text-ink-3">SKU</dt>
+                <dd className="mt-0.5 border-b border-line pb-2 font-medium text-ink">{product.sku}</dd>
               </div>
-            ))}
-          </div>
+              {product.brand && (
+                <div>
+                  <dt className="text-ink-3">Brand</dt>
+                  <dd className="mt-0.5 border-b border-line pb-2 font-medium text-ink">{product.brand}</dd>
+                </div>
+              )}
+              {product.category && (
+                <div>
+                  <dt className="text-ink-3">Category</dt>
+                  <dd className="mt-0.5 border-b border-line pb-2 font-medium text-ink">{product.category.name}</dd>
+                </div>
+              )}
+              {product.variants.length > 0 && (
+                <div>
+                  <dt className="text-ink-3">Options</dt>
+                  <dd className="mt-0.5 border-b border-line pb-2 font-medium text-ink">
+                    {product.variants.length} available
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </section>
         </div>
-      </div>
-
-      <div className="mt-16 max-w-3xl border-t border-ink/10 pt-10">
-        <h2 className="font-display text-xl font-semibold text-ink">Product Description</h2>
-        <p className="mt-4 whitespace-pre-line text-[15px] leading-relaxed text-ink/60">{product.description}</p>
       </div>
 
       {related.length > 0 && (
-        <Reveal className="mt-16 border-t border-ink/10 pt-10">
-          <div className="mb-6 flex items-end justify-between">
-            <h2 className="font-display text-2xl font-semibold text-ink">You May Also Like</h2>
-          </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {related.map((p, idx) => (
-              <Reveal key={p.id} delay={idx * 50}>
+        <section aria-labelledby="similar-heading" className="mt-12 border-t border-line pt-8">
+          <h2 id="similar-heading" className="text-[16px] font-bold uppercase tracking-wide text-ink sm:text-[18px]">
+            Similar products
+          </h2>
+          <SimilarRail>
+            {related.map((p) => (
+              <div key={p.id} className="w-[62vw] shrink-0 snap-start sm:w-[calc((100%-0.75rem*2)/3)] lg:w-[calc((100%-0.75rem*3)/4)] xl:w-[calc((100%-0.75rem*4)/5)]">
                 <ProductCard product={p} />
-              </Reveal>
+              </div>
             ))}
-          </div>
-        </Reveal>
+          </SimilarRail>
+        </section>
       )}
     </div>
   );

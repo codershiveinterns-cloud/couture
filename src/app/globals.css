@@ -1,32 +1,61 @@
 @import "tailwindcss";
 
 :root {
-  /* Warm off-white canvas + near-black ink reads more premium than pure
-     white/black, and gives product photography room to be the accent. */
-  --canvas: #fafaf9;
-  --ink: #0c0a09;
+  /* Myntra-style palette: pure white canvas, deep slate text, pink primary. */
+  --canvas: #ffffff;
+  --ink: #282c3f;
+  --ink-2: #535766;
+  --ink-3: #7e818c;
+  --ink-4: #94969f;
+  --line: #eaeaec;
+  --line-strong: #d4d5d9;
+  --surface: #f5f5f6;
 
-  --brand: #4338ca;
-  --brand-dark: #362f9e;
-  --brand-light: #eef2ff;
+  --brand: #ff3f6c;
+  --brand-dark: #e6355f;
+  --brand-light: #fff0f3;
+
+  --discount: #ff905a;
+  --rating: #14958f;
+  --success: #03a685;
+
+  --nav-men: #ee5f73;
+  --nav-women: #fb56c1;
+  --nav-kids: #f26a10;
+  --nav-home: #f2c210;
+  --nav-beauty: #0db7af;
 }
 
 @theme inline {
   --color-canvas: var(--canvas);
   --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-surface: var(--surface);
   --color-brand: var(--brand);
   --color-brand-dark: var(--brand-dark);
   --color-brand-light: var(--brand-light);
+  --color-discount: var(--discount);
+  --color-rating: var(--rating);
+  --color-success: var(--success);
+  --color-nav-men: var(--nav-men);
+  --color-nav-women: var(--nav-women);
+  --color-nav-kids: var(--nav-kids);
+  --color-nav-home: var(--nav-home);
+  --color-nav-beauty: var(--nav-beauty);
   --font-sans: var(--font-sans);
-  --font-display: var(--font-display);
+  --font-display: var(--font-sans);
 }
 
-/* This storefront ships a single light theme for Milestone 1; it does not
-   follow the OS-level color scheme. */
+/* Single light theme; does not follow the OS color scheme. */
 body {
   background: var(--canvas);
   color: var(--ink);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
 }
 
 ::selection {
@@ -34,25 +63,32 @@ body {
   color: #fff;
 }
 
-/* Slim, unobtrusive scrollbar — small detail, reads as more crafted. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #d6d3d1 transparent;
+  scrollbar-color: var(--line-strong) transparent;
 }
 *::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 *::-webkit-scrollbar-thumb {
-  background: #d6d3d1;
+  background: var(--line-strong);
   border-radius: 999px;
   border: 2px solid var(--canvas);
+}
+
+/* Hide scrollbars on horizontal product rails. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 @keyframes fade-in-up {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -69,34 +105,19 @@ body {
   }
 }
 
-@keyframes marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}
-
 .animate-fade-in-up {
-  animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: fade-in-up 0.35s ease-out both;
 }
 
 .animate-fade-in {
-  animation: fade-in 0.35s ease-out both;
+  animation: fade-in 0.25s ease-out both;
 }
 
-.animate-marquee {
-  animation: marquee 28s linear infinite;
-}
-
-/* Scroll-triggered reveal (paired with the useReveal hook / Reveal component).
-   Starts hidden; a client observer adds .is-visible once the element enters
-   the viewport. */
+/* Scroll-triggered reveal (paired with the Reveal component). */
 .reveal {
   opacity: 0;
-  transform: translateY(24px);
-  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateY(12px);
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
 }
 .reveal.is-visible {
   opacity: 1;
@@ -105,13 +126,36 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-in-up,
-  .animate-fade-in,
-  .animate-marquee {
+  .animate-fade-in {
     animation: none;
   }
   .reveal {
     opacity: 1;
     transform: none;
     transition: none;
+  }
+}
+
+/* Shimmering skeleton block (loading states). */
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.shimmer {
+  background-color: var(--surface);
+  background-image: linear-gradient(90deg, var(--surface) 0%, #ffffff 45%, var(--surface) 90%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none;
+    background-image: none;
   }
 }

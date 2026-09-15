@@ -1,237 +1,243 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type FocusEvent, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { CategorySummary } from '@/lib/types';
+import {
+  BRAND_COLOR,
+  featuredImageFor,
+  megaLinksFor,
+  navColorFor,
+  POPULAR_SEARCHES,
+  SHOP_ALL_LINKS,
+  shortLabelFor,
+  type NavColor,
+} from '@/components/header/navColors';
+import { BagIcon, HeartIcon, MenuIcon, SearchIcon, UserIcon } from '@/components/header/icons';
+import { useScrolledPast } from '@/components/header/useScrolledPast';
+import Logo from '@/components/Logo';
+
+const SHOP_ALL_KEY = '__all__';
+const M2_NOTE = 'Coming in Milestone 2';
+
+interface NavItem {
+  key: string;
+  href: string;
+  label: string;
+  color: NavColor;
+}
 
 export default function Header({ categories }: { categories: CategorySummary[] }) {
-  const router = useRouter();
   const pathname = usePathname();
+  const scrolled = useScrolledPast(8);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [categoriesOpen, setCategoriesOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const [scrolled, setScrolled] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const navRef = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  useEffect(() => {
     const onClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setCategoriesOpen(false);
+      if (navRef.current && !navRef.current.contains(e.target as Node)) {
+        setActiveMenu(null);
       }
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setCategoriesOpen(false);
+      if (e.key === 'Escape') setActiveMenu(null);
     };
     document.addEventListener('mousedown', onClickOutside);
     document.addEventListener('keydown', onKeyDown);
     return () => {
       document.removeEventListener('mousedown', onClickOutside);
       document.removeEventListener('keydown', onKeyDown);
+      if (closeTimer.current) clearTimeout(closeTimer.current);
     };
   }, []);
 
-  const openDropdown = () => {
+  const openMenu = (key: string) => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
-    setCategoriesOpen(true);
+    setActiveMenu(key);
   };
   const scheduleClose = () => {
-    closeTimer.current = setTimeout(() => setCategoriesOpen(false), 150);
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => setActiveMenu(null), 150);
+  };
+  const closeMenu = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setActiveMenu(null);
   };
 
-  const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const trimmed = query.trim();
-    router.push(trimmed ? `/products?q=${encodeURIComponent(trimmed)}` : '/products');
-    setMenuOpen(false);
-  };
+  const navItems: NavItem[] = [
+    ...categories.map((cat, index) => ({
+      key: cat.slug,
+      href: `/categories/${cat.slug}`,
+      label: cat.name,
+      color: navColorFor(cat.slug, index),
+    })),
+    { key: SHOP_ALL_KEY, href: '/products', label: 'Shop All', color: BRAND_COLOR },
+  ];
 
-  const navLinkClass = (href: string) => {
-    const isActive = href === '/' ? pathname === '/' : pathname.startsWith(href);
-    return `relative whitespace-nowrap py-1 transition-colors hover:text-brand ${isActive ? 'text-ink' : 'text-ink/60'} after:absolute after:-bottom-1 after:left-0 after:h-[1.5px] after:rounded-full after:bg-brand after:transition-all after:duration-300 ${
-      isActive ? 'after:w-full' : 'after:w-0'
-    }`;
-  };
+  const isNavActive = (item: NavItem) =>
+    item.key === SHOP_ALL_KEY ? pathname === '/products' || pathname.startsWith('/products/') : pathname.startsWith(item.href);
 
-  const inCategories = pathname.startsWith('/categories');
+  const activeItem = navItems.find((item) => item.key === activeMenu) ?? null;
 
   return (
     <header
-      className={`sticky top-0 z-50 border-b bg-canvas/90 backdrop-blur-md transition-shadow duration-300 ${
-        scrolled ? 'border-ink/10 shadow-[0_1px_0_0_rgba(0,0,0,0.04),0_8px_24px_-16px_rgba(0,0,0,0.15)]' : 'border-transparent'
+      className={`sticky top-0 z-50 bg-white transition-shadow duration-200 ease-out ${
+        scrolled ? 'shadow-[0_4px_16px_rgba(40,44,63,0.10)]' : 'shadow-[0_4px_12px_0_rgba(0,0,0,0.05)]'
       }`}
     >
-      <div
-        className={`mx-auto flex max-w-7xl items-center gap-4 px-4 transition-[padding] duration-300 sm:px-6 lg:px-8 ${
-          scrolled ? 'py-2.5' : 'py-4'
-        }`}
-      >
+      <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4 sm:px-6 lg:h-20 lg:gap-4 lg:px-6 xl:gap-6 xl:px-8">
         <button
           type="button"
-          className="-ml-1 flex h-9 w-9 items-center justify-center rounded-md text-ink transition-colors hover:bg-ink/5 lg:hidden"
+          className="-ml-2 flex h-10 w-10 items-center justify-center rounded-sm text-ink transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 lg:hidden"
           aria-label="Toggle menu"
+          aria-expanded={menuOpen}
           onClick={() => setMenuOpen((v) => !v)}
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            {menuOpen ? (
-              <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
-            ) : (
-              <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />
-            )}
-          </svg>
+          <MenuIcon open={menuOpen} />
         </button>
 
-        <Link href="/" className="group flex shrink-0 items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink text-sm font-bold text-white transition-transform duration-300 group-hover:-rotate-6 group-hover:bg-brand">
-            S
-          </span>
-          <span className="font-display text-lg font-semibold tracking-tight text-ink">Shoply</span>
-        </Link>
+        <Logo id="header-mark" markClassName="h-10 w-10 lg:h-11 lg:w-11" className="[&>span]:hidden sm:[&>span]:flex" />
 
-        <nav className="hidden items-center gap-7 font-display text-[15px] font-medium lg:flex">
-          <Link href="/" className={navLinkClass('/')}>
-            Home
-          </Link>
-          <Link href="/products" className={navLinkClass('/products')}>
-            Shop All
-          </Link>
+        {/* Desktop nav (categories + Shop All) */}
+        <div ref={navRef} className="hidden h-full shrink-0 items-stretch lg:flex" onMouseLeave={scheduleClose}>
+          <nav className="flex h-full items-stretch" aria-label="Primary">
+            {navItems.map((item) => {
+              const active = isNavActive(item);
+              const hovered = activeMenu === item.key;
+              const short = shortLabelFor(item.label);
+              return (
+                <Link
+                  key={item.key}
+                  href={item.href}
+                  onMouseEnter={() => openMenu(item.key)}
+                  onFocus={() => openMenu(item.key)}
+                  onClick={closeMenu}
+                  aria-expanded={hovered}
+                  className={`flex items-center whitespace-nowrap border-b-4 border-t-4 border-t-transparent px-1.5 text-[12px] font-bold uppercase tracking-[0.3px] text-ink transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40 xl:px-3.5 xl:text-[14px] ${
+                    active || hovered ? item.color.border : 'border-b-transparent'
+                  }`}
+                >
+                  {short === item.label ? (
+                    item.label
+                  ) : (
+                    <>
+                      <span className="xl:hidden" aria-hidden="true">
+                        {short}
+                      </span>
+                      <span className="hidden xl:inline">{item.label}</span>
+                    </>
+                  )}
+                </Link>
+              );
+            })}
+          </nav>
 
+          {/* Mega dropdown */}
           <div
-            ref={dropdownRef}
-            className="relative"
-            onMouseEnter={openDropdown}
+            className={`absolute left-0 right-0 top-full z-50 transition-opacity duration-150 ${
+              activeItem ? 'opacity-100' : 'pointer-events-none opacity-0'
+            }`}
+            onMouseEnter={() => activeItem && openMenu(activeItem.key)}
             onMouseLeave={scheduleClose}
+            aria-hidden={!activeItem}
           >
-            <button
-              type="button"
-              onClick={() => setCategoriesOpen((v) => !v)}
-              aria-expanded={categoriesOpen}
-              className={`relative flex items-center gap-1.5 whitespace-nowrap py-1 transition-colors hover:text-brand ${
-                inCategories ? 'text-ink' : 'text-ink/60'
-              }`}
-            >
-              Categories
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                className={`transition-transform duration-200 ${categoriesOpen ? 'rotate-180' : ''}`}
-              >
-                <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-
-            <div
-              className={`absolute left-1/2 top-full z-50 w-64 -translate-x-1/2 pt-3 transition-all duration-200 ${
-                categoriesOpen ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-1 opacity-0'
-              }`}
-            >
-              <div className="overflow-hidden rounded-2xl border border-ink/8 bg-white p-2 shadow-xl shadow-ink/10">
-                {categories.map((cat) => (
-                  <Link
-                    key={cat.id}
-                    href={`/categories/${cat.slug}`}
-                    onClick={() => setCategoriesOpen(false)}
-                    className="flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium text-ink/75 transition-colors hover:bg-brand-light hover:text-brand"
-                  >
-                    {cat.name}
-                    {typeof cat.productCount === 'number' && (
-                      <span className="text-xs text-ink/35">{cat.productCount}</span>
-                    )}
-                  </Link>
-                ))}
+            <div className="border-t border-line bg-white shadow-[0_4px_12px_rgba(40,44,63,0.15)]">
+              <div className="mx-auto grid max-w-7xl grid-cols-6 gap-6 px-8 py-7">
+                {activeItem?.key === SHOP_ALL_KEY ? (
+                  <>
+                    <MegaColumn
+                      title="Shop All"
+                      color={BRAND_COLOR}
+                      links={SHOP_ALL_LINKS}
+                      highlighted
+                      onNavigate={closeMenu}
+                      tabbable={Boolean(activeItem)}
+                    />
+                    {navItems
+                      .filter((item) => item.key !== SHOP_ALL_KEY)
+                      .slice(0, 4)
+                      .map((item) => (
+                        <MegaColumn
+                          key={item.key}
+                          title={item.label}
+                          color={item.color}
+                          links={megaLinksFor(item.key).slice(0, 4)}
+                          onNavigate={closeMenu}
+                          tabbable={Boolean(activeItem)}
+                        />
+                      ))}
+                  </>
+                ) : (
+                  navItems
+                    .filter((item) => item.key !== SHOP_ALL_KEY)
+                    .slice(0, 5)
+                    .map((item) => (
+                      <MegaColumn
+                        key={item.key}
+                        title={item.label}
+                        color={item.color}
+                        links={item.key === activeItem?.key ? megaLinksFor(item.key) : megaLinksFor(item.key).slice(0, 4)}
+                        highlighted={item.key === activeItem?.key}
+                        onNavigate={closeMenu}
+                        tabbable={Boolean(activeItem)}
+                      />
+                    ))
+                )}
+                <FeaturedTile
+                  slug={activeItem && activeItem.key !== SHOP_ALL_KEY ? activeItem.key : null}
+                  label={activeItem?.label ?? 'Shop All'}
+                  href={activeItem?.href ?? '/products'}
+                  onNavigate={closeMenu}
+                  tabbable={Boolean(activeItem)}
+                />
               </div>
             </div>
           </div>
-        </nav>
+        </div>
 
-        <form onSubmit={handleSearch} className="ml-auto hidden flex-1 max-w-md sm:flex">
-          <div className="relative w-full">
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search products, brands, SKUs..."
-              className="w-full rounded-full border border-ink/10 bg-white py-2 pl-4 pr-10 text-sm outline-none transition-all duration-150 placeholder:text-ink/35 focus:border-brand focus:ring-4 focus:ring-brand/10"
-            />
-            <button
-              type="submit"
-              aria-label="Search"
-              className="absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-ink/50 transition-colors hover:bg-brand-light hover:text-brand"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="7" />
-                <path d="M21 21l-4.35-4.35" strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
-        </form>
+        <SearchForm className="ml-auto hidden w-full min-w-[140px] md:block lg:max-w-[220px] xl:max-w-[520px]" />
 
-        <div className="ml-auto flex items-center gap-1 sm:ml-4">
-          <IconButton label="Wishlist">
-            <path d="M12 21s-7.5-4.6-10-9.1C.5 8.2 2.3 5 5.6 5c1.9 0 3.4 1 4.4 2.4C11 6 12.5 5 14.4 5 17.7 5 19.5 8.2 22 11.9 19.5 16.4 12 21 12 21z" />
-          </IconButton>
-          <IconButton label="Account">
-            <circle cx="12" cy="8" r="4" />
-            <path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" strokeLinecap="round" />
-          </IconButton>
-          <IconButton label="Cart">
-            <path d="M6 6h15l-1.5 9h-12z" strokeLinejoin="round" />
-            <path d="M6 6L5 2H2" strokeLinecap="round" />
-            <circle cx="9" cy="20" r="1.5" />
-            <circle cx="18" cy="20" r="1.5" />
-          </IconButton>
+        {/* Right icon stacks — account, wishlist and bag ship in Milestone 2. */}
+        <div className="ml-auto flex shrink-0 items-center gap-1 md:ml-0 lg:gap-2 xl:gap-4">
+          <IconStack label="Profile" className="hidden lg:flex">
+            <UserIcon />
+          </IconStack>
+          <IconStack label="Wishlist">
+            <HeartIcon />
+          </IconStack>
+          <IconStack label="Bag">
+            <BagIcon />
+          </IconStack>
         </div>
       </div>
 
+      {/* Mobile drawer */}
       <div
-        className={`grid overflow-hidden border-ink/10 transition-all duration-300 ease-out lg:hidden ${
-          menuOpen ? 'grid-rows-[1fr] border-t opacity-100' : 'grid-rows-[0fr] border-t-0 opacity-0'
+        className={`grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out lg:hidden ${
+          menuOpen ? 'grid-rows-[1fr] border-t border-line opacity-100' : 'grid-rows-[0fr] opacity-0'
         }`}
       >
-        <div className="min-h-0 px-4 py-3">
-          <form onSubmit={handleSearch} className="mb-3">
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search products..."
-              className="w-full rounded-full border border-ink/10 bg-white px-4 py-2 text-sm outline-none transition-all focus:border-brand focus:ring-4 focus:ring-brand/10"
-            />
-          </form>
-          <nav className="flex flex-col gap-3 font-display text-sm font-medium text-ink/70">
-            <Link href="/" onClick={() => setMenuOpen(false)} className="transition-colors hover:text-brand">
-              Home
-            </Link>
-            <Link href="/products" onClick={() => setMenuOpen(false)} className="transition-colors hover:text-brand">
-              Shop All
-            </Link>
-            <div className="mt-1 border-t border-ink/8 pt-3">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-ink/35">Categories</p>
-              <div className="flex flex-col gap-3">
-                {categories.map((cat) => (
-                  <Link
-                    key={cat.id}
-                    href={`/categories/${cat.slug}`}
-                    onClick={() => setMenuOpen(false)}
-                    className="transition-colors hover:text-brand"
-                  >
-                    {cat.name}
-                  </Link>
-                ))}
-              </div>
-            </div>
+        <div className="min-h-0 max-h-[calc(100vh-3.5rem)] overflow-y-auto px-4 py-3">
+          <SearchForm className="mb-3" suggestions="inline" onNavigate={() => setMenuOpen(false)} />
+          <nav className="flex flex-col text-[14px] text-ink" aria-label="Mobile">
+            <p className="mb-1 mt-1 text-[12px] font-bold uppercase tracking-wide text-ink-3">Categories</p>
+            {navItems.map((item) => (
+              <Link
+                key={item.key}
+                href={item.href}
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-3 border-b border-line py-3 font-bold uppercase tracking-[0.3px] transition-colors hover:text-brand"
+              >
+                <span className={`h-2.5 w-2.5 rounded-full ${item.color.bg}`} aria-hidden="true" />
+                {item.label}
+              </Link>
+            ))}
+            <p className="mb-1 mt-4 text-[12px] font-bold uppercase tracking-wide text-ink-3">Account</p>
+            <p className="py-2 text-[13px] text-ink-3">Login, wishlist and bag arrive in Milestone 2.</p>
           </nav>
         </div>
       </div>
@@ -239,17 +245,206 @@ export default function Header({ categories }: { categories: CategorySummary[] }
   );
 }
 
-function IconButton({ label, children }: { label: string; children: React.ReactNode }) {
+function SearchForm({
+  className = '',
+  suggestions = 'popover',
+  onNavigate,
+}: {
+  className?: string;
+  /** `popover` floats the popular-searches panel under the input; `inline` renders it in flow (mobile drawer). */
+  suggestions?: 'popover' | 'inline';
+  onNavigate?: () => void;
+}) {
+  const router = useRouter();
+  const inputId = useId();
+  const [value, setValue] = useState('');
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [open]);
+
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const q = value.trim();
+    setOpen(false);
+    router.push(q ? `/products?q=${encodeURIComponent(q)}` : '/products');
+    onNavigate?.();
+  };
+
+  const handleBlur = (e: FocusEvent<HTMLFormElement>) => {
+    // Keep the panel open while focus moves between the input and the chips.
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false);
+  };
+
+  const handleKeyDown = (e: ReactKeyboardEvent<HTMLFormElement>) => {
+    if (e.key === 'Escape' && open) {
+      e.stopPropagation();
+      setOpen(false);
+    }
+  };
+
+  const pick = () => {
+    setOpen(false);
+    onNavigate?.();
+  };
+
+  const panelId = `${inputId}-popular`;
+
+  return (
+    <form
+      ref={rootRef}
+      role="search"
+      onSubmit={handleSubmit}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      className={`${suggestions === 'popover' ? 'relative' : ''} ${className}`}
+    >
+      <label htmlFor={inputId} className="sr-only">
+        Search products
+      </label>
+      <div className="flex h-10 items-center rounded-sm border border-surface bg-surface transition-colors focus-within:border-line-strong focus-within:bg-white">
+        <span className="flex w-10 shrink-0 items-center justify-center text-ink-3" aria-hidden="true">
+          <SearchIcon />
+        </span>
+        <input
+          id={inputId}
+          type="search"
+          name="q"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onFocus={() => setOpen(true)}
+          placeholder="Search for products, brands and more"
+          autoComplete="off"
+          aria-controls={panelId}
+          className="h-full w-full min-w-0 bg-transparent pr-3 text-[14px] text-ink placeholder:text-ink-4 focus:outline-none"
+        />
+        <button type="submit" className="sr-only">
+          Search
+        </button>
+      </div>
+
+      {/* Popular searches (static list for Milestone 1; suggestions arrive in Milestone 2). */}
+      <div
+        id={panelId}
+        hidden={!open}
+        className={`${
+          suggestions === 'popover'
+            ? 'absolute left-0 right-0 top-full z-50 mt-1.5 border border-line bg-white p-3 shadow-[0_8px_24px_rgba(40,44,63,0.12)]'
+            : 'mt-2'
+        } animate-fade-in rounded-sm`}
+      >
+        <p className="text-[11px] font-bold uppercase tracking-wide text-ink-3">Popular searches</p>
+        <ul className="mt-2 flex flex-wrap gap-1.5">
+          {POPULAR_SEARCHES.map((term) => (
+            <li key={term}>
+              <Link
+                href={`/products?q=${encodeURIComponent(term)}`}
+                onClick={pick}
+                tabIndex={open ? 0 : -1}
+                className="inline-flex h-7 items-center rounded-full border border-line bg-surface px-3 text-[12px] font-medium text-ink-2 transition-colors duration-150 hover:border-brand hover:bg-brand-light hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+              >
+                {term}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </form>
+  );
+}
+
+function MegaColumn({
+  title,
+  color,
+  links,
+  highlighted = false,
+  onNavigate,
+  tabbable,
+}: {
+  title: string;
+  color: NavColor;
+  links: { href: string; label: string }[];
+  highlighted?: boolean;
+  onNavigate: () => void;
+  tabbable: boolean;
+}) {
+  return (
+    <div className={`-mx-3 px-3 py-1 ${highlighted ? 'bg-surface' : ''}`}>
+      <h3 className={`mb-2.5 text-[14px] font-bold uppercase tracking-[0.3px] ${color.text}`}>{title}</h3>
+      <ul className="space-y-1.5">
+        {links.map((link) => (
+          <li key={link.href}>
+            <Link
+              href={link.href}
+              tabIndex={tabbable ? 0 : -1}
+              onClick={onNavigate}
+              className="block rounded-sm text-[14px] text-ink-2 transition-colors hover:font-bold hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+            >
+              {link.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Image tile on the right of the mega menu pointing at the hovered category. */
+function FeaturedTile({
+  slug,
+  label,
+  href,
+  onNavigate,
+  tabbable,
+}: {
+  slug: string | null;
+  label: string;
+  href: string;
+  onNavigate: () => void;
+  tabbable: boolean;
+}) {
+  const caption = slug ? `Trending in ${label}` : 'Trending now';
+  return (
+    <Link
+      href={href}
+      tabIndex={tabbable ? 0 : -1}
+      onClick={onNavigate}
+      aria-label={`${caption} — shop ${label}`}
+      className="group relative block aspect-[4/5] overflow-hidden rounded-sm bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+    >
+      <Image
+        src={featuredImageFor(slug)}
+        alt=""
+        fill
+        sizes="220px"
+        className="object-cover transition-transform duration-300 ease-out group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+      />
+      <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 to-transparent px-3 pb-3 pt-8">
+        <span className="block text-[10px] font-bold uppercase tracking-[0.15em] text-white/80">Featured</span>
+        <span className="mt-0.5 block text-[13px] font-bold leading-tight text-white">{caption}</span>
+      </span>
+    </Link>
+  );
+}
+
+/** Milestone 1 placeholder: looks like Myntra's icon stack, but has no destination yet. */
+function IconStack({ label, className = '', children }: { label: string; className?: string; children: React.ReactNode }) {
   return (
     <button
       type="button"
-      title={`${label} — coming in Milestone 2`}
-      className="flex h-9 w-9 items-center justify-center rounded-full text-ink/70 transition-all duration-150 hover:bg-brand-light hover:text-brand active:scale-90"
+      title={`${label} — ${M2_NOTE}`}
+      aria-label={`${label} (${M2_NOTE})`}
+      className={`relative flex h-10 w-10 cursor-default flex-col items-center justify-center gap-0.5 rounded-sm text-[12px] font-bold text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 lg:h-20 lg:w-auto lg:border-b-4 lg:border-t-4 lg:border-b-transparent lg:border-t-transparent lg:px-2 ${className}`}
     >
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        {children}
-      </svg>
-      <span className="sr-only">{label}</span>
+      {children}
+      <span className="hidden leading-none xl:block">{label}</span>
     </button>
   );
 }

@@ -12,8 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Standalone CommonJS dev tooling, not part of the app bundle.
-    "scripts/**",
+    // Standalone CommonJS seed tooling, not part of the app bundle.
+    "prisma/**",
   ]),
 ]);
 

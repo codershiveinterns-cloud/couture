@@ -9,7 +9,7 @@ export async function GET(
     const { slug } = await params;
     const related = await getRelatedProducts(slug);
     return NextResponse.json({ success: true, data: related });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: 'Failed to fetch related products' },
       { status: 500 }
