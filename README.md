@@ -1,6 +1,6 @@
-# Couture — Modern E-Commerce Platform (Milestone 1)
+# Couture — Modern E-Commerce Platform (Milestones 1 & 2)
 
-Couture is a modern storefront built per the project PRD. This repo delivers **Milestone 1 — the storefront foundation** — as a single Next.js app that runs with zero configuration on a fresh clone or Vercel deploy. The UI follows a Myntra-style design system (white canvas, pink primary, bold uppercase navigation, squared cards).
+Couture is a modern storefront built per the project PRD. This repo delivers **Milestone 1 (storefront foundation) and Milestone 2 (customer shopping experience)** as a single Next.js app that runs with zero configuration on a fresh clone or Vercel deploy. The UI follows a Myntra-style design system (white canvas, pink primary, bold uppercase navigation, squared cards).
 
 ## Stack
 
@@ -30,17 +30,40 @@ Other scripts: `npm run lint` (ESLint), `npx tsc --noEmit` (type check), `npm ru
 - **Responsive layout** (mobile / tablet / desktop) with accessible controls
 - **Initial data structure:** typed catalog model (`src/lib/types.ts`, `src/lib/mockTypes.ts`) and `prisma/` schema scaffolding for the future database (not used at runtime)
 
-### Milestone 2 previews
+## Milestone 2 — customer experience (delivered)
 
-The header's Profile / Wishlist / Bag icons, the wishlist hearts and the "Add to bag" / "Buy now" buttons are present as UI previews only — they give local feedback but do not persist anything. Authentication, wishlist, cart, checkout, reviews and advanced filtering are Milestone 2 deliverables.
+- **Search:** header autocomplete (products + categories, keyboard navigable, popular searches) and multi-term search across name, SKU, brand, category and descriptions
+- **Advanced filters:** category, brand, price range, minimum rating, in-stock, colour and size — desktop sidebar and mobile SORT | FILTER drawer synced to URL params, active-filter chips, facet counts
+- **Sorting:** What's New, Popularity, Price (asc/desc), Customer Rating
+- **Authentication:** register, login, logout, forgot password + reset password (demo mode), safe `?next=` redirects
+- **Account:** overview, profile (name/email/phone), change password, addresses (add/edit/delete/default), order history and order detail with status timeline
+- **Wishlist:** persistent for guests and users, toggle from cards and product pages, move to bag
+- **Bag:** line items keyed by product + variant, quantity with stock clamping, coupons, free-shipping progress, price details (MRP, discount, coupon, shipping, tax)
+- **Checkout:** BAG → ADDRESS → PAYMENT stepper, saved or new address, Cash on Delivery (card / UPI arrive with real payments in Milestone 3), order review, confirmation page
+- **Reviews:** seeded demo reviews plus one review per logged-in user, rating summary and distribution
+
+## Demo data layer
+
+There is no backend or database yet. Everything a customer does is stored in the browser's `localStorage` behind typed service modules in `src/lib/services/` so that Milestone 3 can swap in real APIs without touching the UI.
+
+- Keys are prefixed `couture:v1:` (`users`, `session`, `resetTokens`, `reviews`, and per-owner `cart:<id>`, `coupon:<id>`, `wishlist:<id>`, `addresses:<userId>`, `orders:<userId>`).
+- Passwords are salted and hashed with SHA-256 (Web Crypto); sessions expire after 7 days.
+- Guests can use the bag and wishlist; on login/registration the guest bag is merged into the user's bag and the wishlist is unioned.
+- Pricing: free shipping at $50 (otherwise $5.99), 8% tax, coupon applied before shipping and tax. Coupons: `WELCOME10` (10% off, min $30, max $25), `FLAT5` ($5 off, min $20), `SUMMER25` (intentionally expired, to demo the error path).
+- Password reset: `/forgot-password` shows a clearly labelled **demo-mode reset link** when the account exists (no email service yet). Tokens are single-use and expire after 30 minutes.
 
 ## Project structure
 
 ```
-src/app/            App Router pages: /, /products, /categories/[slug], /products/[slug]; JSON API under /api
-src/components/     Header (+ header/ nav colours & icons), Footer, ProductCard, ProductActions, ProductGallery,
-                    SortSelect, Pagination, StarRating, CategoryCard, home/ (carousel, banners, rails)
-src/lib/            mock catalog data, typed catalog helpers (search, sort, pagination), formatting
+src/app/            App Router pages: /, /products, /categories/[slug], /products/[slug], /login, /register,
+                    /forgot-password, /reset-password, /account (overview, profile, addresses, orders),
+                    /wishlist, /cart, /checkout; JSON API under /api
+src/components/     Header (+ header/), Footer, ProductCard, ProductActions, ProductGallery, home/, catalog/
+                    (filters, search), auth/, account/, cart/, checkout/, wishlist/, reviews/, forms/, ui/
+src/context/        Auth, Cart, Wishlist and Toast providers + hooks
+src/hooks/          useHydrated, useAddresses, useOrders, useReviews, ...
+src/lib/            mock catalog data, catalog helpers (search, filters, sort, pagination), pricing, coupons,
+                    validation, safeRedirect, storage, services/ (auth, cart, wishlist, addresses, orders, reviews)
 prisma/             future database schema (not used at runtime)
 ```
 

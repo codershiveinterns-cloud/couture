@@ -2,25 +2,37 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useId, useRef, useState, type FocusEvent, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { usePathname } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import type { CategorySummary } from '@/lib/types';
+import { buildLoginHref, buildRegisterHref } from '@/lib/safeRedirect';
+import { useAuth } from '@/context/AuthContext';
+import { useCart } from '@/context/CartContext';
+import { useWishlist } from '@/context/WishlistContext';
+import { useOnClickOutside } from '@/hooks/useOnClickOutside';
+import SearchAutocomplete from '@/components/catalog/SearchAutocomplete';
 import {
   BRAND_COLOR,
   featuredImageFor,
   megaLinksFor,
   navColorFor,
-  POPULAR_SEARCHES,
   SHOP_ALL_LINKS,
   shortLabelFor,
   type NavColor,
 } from '@/components/header/navColors';
-import { BagIcon, HeartIcon, MenuIcon, SearchIcon, UserIcon } from '@/components/header/icons';
+import { BagIcon, HeartIcon, MenuIcon, UserIcon } from '@/components/header/icons';
 import { useScrolledPast } from '@/components/header/useScrolledPast';
 import Logo from '@/components/Logo';
 
 const SHOP_ALL_KEY = '__all__';
-const M2_NOTE = 'Coming in Milestone 2';
+const PROTECTED_PREFIXES = ['/account', '/checkout'];
+
+const ACCOUNT_LINKS = [
+  { href: '/account', label: 'Profile' },
+  { href: '/account/orders', label: 'Orders' },
+  { href: '/account/addresses', label: 'Addresses' },
+  { href: '/wishlist', label: 'Wishlist' },
+];
 
 interface NavItem {
   key: string;
@@ -32,10 +44,17 @@ interface NavItem {
 export default function Header({ categories }: { categories: CategorySummary[] }) {
   const pathname = usePathname();
   const scrolled = useScrolledPast(8);
+  const { user, status, logout } = useAuth();
+  const { itemCount, isHydrated: cartHydrated } = useCart();
+  const { count: wishlistCount, isHydrated: wishlistHydrated } = useWishlist();
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [accountOpen, setAccountOpen] = useState(false);
   const navRef = useRef<HTMLDivElement>(null);
+  const accountRef = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useOnClickOutside(accountRef, () => setAccountOpen(false), accountOpen);
 
   useEffect(() => {
     const onClickOutside = (e: MouseEvent) => {
@@ -44,7 +63,10 @@ export default function Header({ categories }: { categories: CategorySummary[] }
       }
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setActiveMenu(null);
+      if (e.key === 'Escape') {
+        setActiveMenu(null);
+        setAccountOpen(false);
+      }
     };
     document.addEventListener('mousedown', onClickOutside);
     document.addEventListener('keydown', onKeyDown);
@@ -68,6 +90,18 @@ export default function Header({ categories }: { categories: CategorySummary[] }
     setActiveMenu(null);
   };
 
+  const closeAll = () => {
+    setMenuOpen(false);
+    setAccountOpen(false);
+    closeMenu();
+  };
+
+  const handleLogout = () => {
+    closeAll();
+    const onProtectedPage = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
+    logout(onProtectedPage ? { redirectTo: '/' } : undefined);
+  };
+
   const navItems: NavItem[] = [
     ...categories.map((cat, index) => ({
       key: cat.slug,
@@ -82,6 +116,11 @@ export default function Header({ categories }: { categories: CategorySummary[] }
     item.key === SHOP_ALL_KEY ? pathname === '/products' || pathname.startsWith('/products/') : pathname.startsWith(item.href);
 
   const activeItem = navItems.find((item) => item.key === activeMenu) ?? null;
+  const isAuthenticated = status === 'authenticated' && user !== null;
+  const firstName = user?.name.trim().split(/\s+/)[0] || 'Account';
+  const showWishlistBadge = wishlistHydrated && wishlistCount > 0;
+  const showCartBadge = cartHydrated && itemCount > 0;
+  const menuTab = accountOpen ? 0 : -1;
 
   return (
     <header
@@ -117,19 +156,16 @@ export default function Header({ categories }: { categories: CategorySummary[] }
                   onFocus={() => openMenu(item.key)}
                   onClick={closeMenu}
                   aria-expanded={hovered}
-                  className={`flex items-center whitespace-nowrap border-b-4 border-t-4 border-t-transparent px-1.5 text-[12px] font-bold uppercase tracking-[0.3px] text-ink transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40 xl:px-3.5 xl:text-[14px] ${
+                  className={`flex items-center whitespace-nowrap border-b-4 border-t-4 border-t-transparent px-2 text-[12px] font-bold uppercase tracking-[0.3px] text-ink transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40 xl:px-3 xl:text-[13px] 2xl:text-[14px] ${
                     active || hovered ? item.color.border : 'border-b-transparent'
                   }`}
                 >
                   {short === item.label ? (
                     item.label
                   ) : (
-                    <>
-                      <span className="xl:hidden" aria-hidden="true">
-                        {short}
-                      </span>
-                      <span className="hidden xl:inline">{item.label}</span>
-                    </>
+                    <span title={item.label} aria-label={item.label}>
+                      {short}
+                    </span>
                   )}
                 </Link>
               );
@@ -199,17 +235,120 @@ export default function Header({ categories }: { categories: CategorySummary[] }
           </div>
         </div>
 
-        <SearchForm className="ml-auto hidden w-full min-w-[140px] md:block lg:max-w-[220px] xl:max-w-[520px]" />
+        <SearchAutocomplete
+          className="ml-auto hidden w-full min-w-0 flex-1 md:block lg:max-w-[220px] xl:max-w-[360px] 2xl:max-w-[480px]"
+          placeholder="Search for products, brands and more"
+        />
 
-        {/* Right icon stacks — account, wishlist and bag ship in Milestone 2. */}
+        {/* Right icon stacks */}
         <div className="ml-auto flex shrink-0 items-center gap-1 md:ml-0 lg:gap-2 xl:gap-4">
-          <IconStack label="Profile" className="hidden lg:flex">
-            <UserIcon />
-          </IconStack>
-          <IconStack label="Wishlist">
+          <div ref={accountRef} className="relative hidden lg:block">
+            <button
+              type="button"
+              onClick={() => setAccountOpen((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={accountOpen}
+              aria-controls="account-menu"
+              aria-label={isAuthenticated ? `Account menu for ${firstName}` : 'Account'}
+              className={`flex h-20 flex-col items-center justify-center gap-0.5 border-b-4 border-t-4 border-t-transparent px-2 text-[12px] font-bold text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40 ${
+                accountOpen || pathname.startsWith('/account') ? 'border-b-brand' : 'border-b-transparent'
+              }`}
+            >
+              <UserIcon />
+              <span className="hidden max-w-[5rem] truncate leading-none xl:block">{isAuthenticated ? firstName : 'Profile'}</span>
+            </button>
+
+            <div
+              className={`absolute right-0 top-full z-50 w-[300px] pt-1 transition-opacity duration-150 ${
+                accountOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+              }`}
+            >
+              <div
+                id="account-menu"
+                role="menu"
+                aria-hidden={!accountOpen}
+                className="rounded-sm border border-line bg-white shadow-[0_4px_12px_rgba(40,44,63,0.15)]"
+              >
+                {status === 'loading' ? (
+                  <div className="space-y-2 p-4" aria-hidden="true">
+                    <div className="h-4 w-2/3 animate-pulse rounded-sm bg-surface" />
+                    <div className="h-4 w-1/2 animate-pulse rounded-sm bg-surface" />
+                  </div>
+                ) : isAuthenticated ? (
+                  <>
+                    <div className="border-b border-line px-4 py-3">
+                      <p className="truncate text-[14px] font-bold text-ink">Hello, {firstName}</p>
+                      <p className="truncate text-[12px] text-ink-3">{user.email}</p>
+                    </div>
+                    <div className="py-1.5">
+                      {ACCOUNT_LINKS.map((link) => (
+                        <MenuLink key={link.href} href={link.href} onClick={closeAll} tabIndex={menuTab}>
+                          {link.label}
+                        </MenuLink>
+                      ))}
+                    </div>
+                    <div className="border-t border-line py-1.5">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        tabIndex={menuTab}
+                        onClick={handleLogout}
+                        className="flex w-full items-center px-4 py-2 text-left text-[14px] text-ink-2 transition-colors hover:bg-surface hover:font-bold hover:text-ink focus-visible:outline-none focus-visible:bg-surface"
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="px-4 pb-3 pt-3.5">
+                      <p className="text-[14px] font-bold text-ink">Welcome</p>
+                      <p className="mt-0.5 text-[13px] text-ink-2">To access account and manage orders</p>
+                      <div className="mt-3 flex gap-2">
+                        <Link
+                          href={buildLoginHref()}
+                          role="menuitem"
+                          tabIndex={menuTab}
+                          onClick={closeAll}
+                          className="inline-flex h-9 items-center justify-center rounded-sm border border-line-strong px-4 text-[13px] font-bold uppercase text-brand transition-colors hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+                        >
+                          Login
+                        </Link>
+                        <Link
+                          href={buildRegisterHref()}
+                          role="menuitem"
+                          tabIndex={menuTab}
+                          onClick={closeAll}
+                          className="inline-flex h-9 items-center justify-center rounded-sm border border-line-strong px-4 text-[13px] font-bold uppercase text-brand transition-colors hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+                        >
+                          Signup
+                        </Link>
+                      </div>
+                    </div>
+                    <div className="border-t border-line py-1.5">
+                      <MenuLink href="/account/orders" onClick={closeAll} tabIndex={menuTab}>
+                        Orders
+                      </MenuLink>
+                      <MenuLink href="/wishlist" onClick={closeAll} tabIndex={menuTab}>
+                        Wishlist
+                      </MenuLink>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <IconStack
+            href="/wishlist"
+            label="Wishlist"
+            active={pathname.startsWith('/wishlist')}
+            badge={showWishlistBadge ? wishlistCount : null}
+          >
             <HeartIcon />
           </IconStack>
-          <IconStack label="Bag">
+
+          <IconStack href="/cart" label="Bag" active={pathname.startsWith('/cart')} badge={showCartBadge ? itemCount : null}>
             <BagIcon />
           </IconStack>
         </div>
@@ -222,7 +361,11 @@ export default function Header({ categories }: { categories: CategorySummary[] }
         }`}
       >
         <div className="min-h-0 max-h-[calc(100vh-3.5rem)] overflow-y-auto px-4 py-3">
-          <SearchForm className="mb-3" suggestions="inline" onNavigate={() => setMenuOpen(false)} />
+          <SearchAutocomplete
+            className="mb-3"
+            placeholder="Search for products, brands and more"
+            onNavigate={() => setMenuOpen(false)}
+          />
           <nav className="flex flex-col text-[14px] text-ink" aria-label="Mobile">
             <p className="mb-1 mt-1 text-[12px] font-bold uppercase tracking-wide text-ink-3">Categories</p>
             {navItems.map((item) => (
@@ -237,126 +380,64 @@ export default function Header({ categories }: { categories: CategorySummary[] }
               </Link>
             ))}
             <p className="mb-1 mt-4 text-[12px] font-bold uppercase tracking-wide text-ink-3">Account</p>
-            <p className="py-2 text-[13px] text-ink-3">Login, wishlist and bag arrive in Milestone 2.</p>
+            {status === 'loading' ? (
+              <div className="my-3 h-4 w-1/3 animate-pulse rounded-sm bg-surface" aria-hidden="true" />
+            ) : isAuthenticated ? (
+              <>
+                <p className="py-2 text-[13px] text-ink-2">
+                  Hello, <span className="font-bold text-ink">{firstName}</span>
+                </p>
+                {ACCOUNT_LINKS.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMenuOpen(false)}
+                    className="border-b border-line py-3 text-ink-2 transition-colors hover:text-ink"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+                <Link href="/cart" onClick={() => setMenuOpen(false)} className="border-b border-line py-3 text-ink-2 transition-colors hover:text-ink">
+                  Bag
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="py-3 text-left text-[13px] font-bold uppercase text-brand transition-colors hover:text-brand-dark"
+                >
+                  Logout ({firstName})
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="flex gap-2 py-2">
+                  <Link
+                    href={buildLoginHref()}
+                    onClick={() => setMenuOpen(false)}
+                    className="inline-flex h-10 flex-1 items-center justify-center rounded-sm bg-brand text-[13px] font-bold uppercase text-white transition-colors hover:bg-brand-dark"
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    href={buildRegisterHref()}
+                    onClick={() => setMenuOpen(false)}
+                    className="inline-flex h-10 flex-1 items-center justify-center rounded-sm border border-line-strong text-[13px] font-bold uppercase text-ink transition-colors hover:border-ink"
+                  >
+                    Signup
+                  </Link>
+                </div>
+                <Link href="/wishlist" onClick={() => setMenuOpen(false)} className="border-b border-line py-3 text-ink-2 transition-colors hover:text-ink">
+                  Wishlist
+                </Link>
+                <Link href="/cart" onClick={() => setMenuOpen(false)} className="py-3 text-ink-2 transition-colors hover:text-ink">
+                  Bag
+                </Link>
+              </>
+            )}
           </nav>
         </div>
       </div>
     </header>
-  );
-}
-
-function SearchForm({
-  className = '',
-  suggestions = 'popover',
-  onNavigate,
-}: {
-  className?: string;
-  /** `popover` floats the popular-searches panel under the input; `inline` renders it in flow (mobile drawer). */
-  suggestions?: 'popover' | 'inline';
-  onNavigate?: () => void;
-}) {
-  const router = useRouter();
-  const inputId = useId();
-  const [value, setValue] = useState('');
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLFormElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onClickOutside = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
-  }, [open]);
-
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const q = value.trim();
-    setOpen(false);
-    router.push(q ? `/products?q=${encodeURIComponent(q)}` : '/products');
-    onNavigate?.();
-  };
-
-  const handleBlur = (e: FocusEvent<HTMLFormElement>) => {
-    // Keep the panel open while focus moves between the input and the chips.
-    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false);
-  };
-
-  const handleKeyDown = (e: ReactKeyboardEvent<HTMLFormElement>) => {
-    if (e.key === 'Escape' && open) {
-      e.stopPropagation();
-      setOpen(false);
-    }
-  };
-
-  const pick = () => {
-    setOpen(false);
-    onNavigate?.();
-  };
-
-  const panelId = `${inputId}-popular`;
-
-  return (
-    <form
-      ref={rootRef}
-      role="search"
-      onSubmit={handleSubmit}
-      onBlur={handleBlur}
-      onKeyDown={handleKeyDown}
-      className={`${suggestions === 'popover' ? 'relative' : ''} ${className}`}
-    >
-      <label htmlFor={inputId} className="sr-only">
-        Search products
-      </label>
-      <div className="flex h-10 items-center rounded-sm border border-surface bg-surface transition-colors focus-within:border-line-strong focus-within:bg-white">
-        <span className="flex w-10 shrink-0 items-center justify-center text-ink-3" aria-hidden="true">
-          <SearchIcon />
-        </span>
-        <input
-          id={inputId}
-          type="search"
-          name="q"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onFocus={() => setOpen(true)}
-          placeholder="Search for products, brands and more"
-          autoComplete="off"
-          aria-controls={panelId}
-          className="h-full w-full min-w-0 bg-transparent pr-3 text-[14px] text-ink placeholder:text-ink-4 focus:outline-none"
-        />
-        <button type="submit" className="sr-only">
-          Search
-        </button>
-      </div>
-
-      {/* Popular searches (static list for Milestone 1; suggestions arrive in Milestone 2). */}
-      <div
-        id={panelId}
-        hidden={!open}
-        className={`${
-          suggestions === 'popover'
-            ? 'absolute left-0 right-0 top-full z-50 mt-1.5 border border-line bg-white p-3 shadow-[0_8px_24px_rgba(40,44,63,0.12)]'
-            : 'mt-2'
-        } animate-fade-in rounded-sm`}
-      >
-        <p className="text-[11px] font-bold uppercase tracking-wide text-ink-3">Popular searches</p>
-        <ul className="mt-2 flex flex-wrap gap-1.5">
-          {POPULAR_SEARCHES.map((term) => (
-            <li key={term}>
-              <Link
-                href={`/products?q=${encodeURIComponent(term)}`}
-                onClick={pick}
-                tabIndex={open ? 0 : -1}
-                className="inline-flex h-7 items-center rounded-full border border-line bg-surface px-3 text-[12px] font-medium text-ink-2 transition-colors duration-150 hover:border-brand hover:bg-brand-light hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-              >
-                {term}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </form>
   );
 }
 
@@ -434,17 +515,60 @@ function FeaturedTile({
   );
 }
 
-/** Milestone 1 placeholder: looks like Myntra's icon stack, but has no destination yet. */
-function IconStack({ label, className = '', children }: { label: string; className?: string; children: React.ReactNode }) {
+function IconStack({
+  href,
+  label,
+  active,
+  badge,
+  children,
+}: {
+  href: string;
+  label: string;
+  active: boolean;
+  badge: number | null;
+  children: React.ReactNode;
+}) {
   return (
-    <button
-      type="button"
-      title={`${label} — ${M2_NOTE}`}
-      aria-label={`${label} (${M2_NOTE})`}
-      className={`relative flex h-10 w-10 cursor-default flex-col items-center justify-center gap-0.5 rounded-sm text-[12px] font-bold text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 lg:h-20 lg:w-auto lg:border-b-4 lg:border-t-4 lg:border-b-transparent lg:border-t-transparent lg:px-2 ${className}`}
+    <Link
+      href={href}
+      aria-label={badge ? `${label} (${badge})` : label}
+      className={`relative flex h-10 w-10 flex-col items-center justify-center gap-0.5 rounded-sm text-[12px] font-bold text-ink transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 lg:h-20 lg:w-auto lg:rounded-none lg:border-b-4 lg:border-t-4 lg:border-t-transparent lg:px-2 lg:hover:bg-transparent lg:focus-visible:ring-inset ${
+        active ? 'lg:border-b-brand' : 'lg:border-b-transparent'
+      }`}
+    >
+      <span className="relative">
+        {children}
+        {badge !== null && (
+          <span className="absolute -right-2 -top-1.5 flex h-[18px] min-w-[18px] animate-fade-in items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white">
+            {badge > 99 ? '99+' : badge}
+          </span>
+        )}
+      </span>
+      <span className="hidden leading-none xl:block">{label}</span>
+    </Link>
+  );
+}
+
+function MenuLink({
+  href,
+  onClick,
+  tabIndex,
+  children,
+}: {
+  href: string;
+  onClick: () => void;
+  tabIndex: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      role="menuitem"
+      tabIndex={tabIndex}
+      onClick={onClick}
+      className="flex items-center px-4 py-2 text-[14px] text-ink-2 transition-colors hover:bg-surface hover:font-bold hover:text-ink focus-visible:outline-none focus-visible:bg-surface"
     >
       {children}
-      <span className="hidden leading-none xl:block">{label}</span>
-    </button>
+    </Link>
   );
 }

@@ -1,16 +1,8 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
-import { DEFAULT_SORT, isProductSort } from '@/lib/api';
-import type { ProductSort } from '@/lib/types';
-
-const SORT_OPTIONS: { value: ProductSort; label: string }[] = [
-  { value: 'newest', label: "What's New" },
-  { value: 'popularity', label: 'Popularity' },
-  { value: 'price_asc', label: 'Price: Low to High' },
-  { value: 'price_desc', label: 'Price: High to Low' },
-  { value: 'rating', label: 'Customer Rating' },
-];
+import { SORT_OPTIONS } from '@/components/catalog/catalogParams';
+import { useCatalogParams } from '@/components/catalog/useCatalogParams';
+import { isProductSort } from '@/lib/api';
 
 export default function SortSelect({
   basePath,
@@ -21,16 +13,11 @@ export default function SortSelect({
   current?: string;
   className?: string;
 }) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const value = isProductSort(current) ? current : DEFAULT_SORT;
+  const { filters, update } = useCatalogParams(basePath);
+  const value = isProductSort(current) ? current : filters.sort;
 
   const onChange = (next: string) => {
-    if (!isProductSort(next)) return;
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('sort', next);
-    params.delete('page'); // sorting restarts from the first page
-    router.push(`${basePath}?${params.toString()}`);
+    if (isProductSort(next)) update({ sort: next }); // update() resets to page 1
   };
 
   return (

@@ -2,18 +2,18 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
-import { getCategoryBySlug, getProducts, isProductSort } from '@/lib/api';
+import { getCategoryBySlug, getProducts, parseProductQuery } from '@/lib/api';
 import FadeImage from '@/components/FadeImage';
 import ProductCard from '@/components/ProductCard';
 import Pagination from '@/components/Pagination';
 import SortSelect from '@/components/SortSelect';
+import FilterSidebar from '@/components/catalog/FilterSidebar';
+import MobileFilterDrawer from '@/components/catalog/MobileFilterDrawer';
+import ActiveFilterChips from '@/components/catalog/ActiveFilterChips';
+import { buildCatalogHref, toCatalogFilters } from '@/components/catalog/catalogParams';
 
 // Render per-request so catalog changes show without a rebuild.
 export const dynamic = 'force-dynamic';
-
-function first(value: string | string[] | undefined): string | undefined {
-  return typeof value === 'string' ? value : undefined;
-}
 
 export async function generateMetadata({ params }: PageProps<'/categories/[slug]'>): Promise<Metadata> {
   const { slug } = await params;
@@ -30,16 +30,26 @@ export default async function CategoryPage({ params, searchParams }: PageProps<'
   if (!category) notFound();
 
   const basePath = `/categories/${slug}`;
-  const page = Number(first(sp.page)) || 1;
-  const q = first(sp.q)?.trim() || undefined;
-  const rawSort = first(sp.sort);
-  const sort = isProductSort(rawSort) ? rawSort : undefined;
-
-  const result = await getProducts({ page, category: slug, q, sort, pageSize: 12 });
+  const query = parseProductQuery(sp);
+  const filters = toCatalogFilters(query);
+  const result = await getProducts({ ...query, category: slug, pageSize: 12 });
+  const { q } = result.query;
   const total = result.meta.total;
+  const hasFilters = result.facets.total > 0;
+
+  const clearFiltersHref = buildCatalogHref(basePath, {
+    q: filters.q,
+    featured: false,
+    sort: filters.sort,
+    page: 1,
+    brands: [],
+    colors: [],
+    sizes: [],
+    inStock: false,
+  });
 
   return (
-    <div className="mx-auto max-w-7xl px-4 pb-12 pt-5 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl px-4 pb-20 pt-5 sm:px-6 lg:px-8 lg:pb-12">
       {/* Hero banner */}
       <section
         aria-label={`${category.name} banner`}
@@ -55,10 +65,7 @@ export default async function CategoryPage({ params, searchParams }: PageProps<'
             className="object-cover"
           />
         )}
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/40 to-black/5"
-        />
+        <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/40 to-black/5" />
         <div className="absolute inset-0 flex flex-col justify-center px-5 sm:px-10">
           <span className="inline-flex w-fit items-center rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.15em] text-white backdrop-blur-sm">
             {total === 1 ? '1 item' : `${total} items`}
@@ -89,39 +96,90 @@ export default async function CategoryPage({ params, searchParams }: PageProps<'
         <span className="text-[14px] text-ink-3">- {total === 1 ? '1 item' : `${total} items`}</span>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
-        <span className="text-[14px] text-ink-3">
-          {result.meta.totalPages > 1 ? `Page ${result.meta.page} of ${result.meta.totalPages}` : ''}
-        </span>
-        <Suspense fallback={null}>
-          <SortSelect basePath={basePath} current={sort} />
-        </Suspense>
+      <div className="mt-5 flex flex-col border-t border-line pt-5 lg:flex-row lg:items-start">
+        {/* Desktop filter sidebar */}
+        <div className="hidden w-60 shrink-0 border-r border-line lg:sticky lg:top-24 lg:block lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
+          <Suspense fallback={<SidebarFallback />}>
+            <FilterSidebar basePath={basePath} facets={result.facets} />
+          </Suspense>
+        </div>
+
+        <div className="min-w-0 flex-1 lg:pl-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-[14px] text-ink-3">
+              {result.meta.totalPages > 1 ? `Page ${result.meta.page} of ${result.meta.totalPages}` : ''}
+            </span>
+            <Suspense fallback={null}>
+              <SortSelect basePath={basePath} current={result.query.sort} className="hidden lg:flex" />
+            </Suspense>
+          </div>
+
+          <Suspense fallback={null}>
+            <ActiveFilterChips basePath={basePath} hideCategory className="mt-4" />
+          </Suspense>
+
+          {/* Mobile SORT | FILTER bar */}
+          <Suspense fallback={null}>
+            <MobileFilterDrawer basePath={basePath} facets={result.facets} resultCount={total} className="lg:hidden" />
+          </Suspense>
+
+          {result.data.length === 0 ? (
+            <div className="mt-6 flex flex-col items-center border border-line px-6 py-14 text-center">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="text-ink-4" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="M21 21l-4.35-4.35M8 11h6" strokeLinecap="round" />
+              </svg>
+              <h2 className="mt-4 text-[18px] font-bold text-ink">
+                {q
+                  ? `No ${category.name.toLowerCase()} products match “${q}”`
+                  : hasFilters
+                    ? 'No products match these filters'
+                    : 'No products in this category yet'}
+              </h2>
+              <p className="mt-1.5 max-w-md text-[14px] text-ink-3">
+                {q || hasFilters
+                  ? 'Try removing a filter or widening the price range to see more products.'
+                  : 'Check back soon or browse the rest of the store.'}
+              </p>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                {hasFilters && (
+                  <Link
+                    href={clearFiltersHref}
+                    className="inline-flex h-11 items-center rounded-sm bg-brand px-6 text-[14px] font-bold uppercase tracking-wide text-white transition-colors hover:bg-brand-dark"
+                  >
+                    Clear filters
+                  </Link>
+                )}
+                <Link
+                  href={q ? basePath : '/products'}
+                  className="inline-flex h-11 items-center rounded-sm border border-line-strong bg-white px-6 text-[14px] font-bold uppercase tracking-wide text-ink transition-colors hover:border-ink"
+                >
+                  {q ? `Browse all ${category.name}` : 'Browse all products'}
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 xl:grid-cols-4">
+              {result.data.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
+
+          <Pagination meta={result.meta} basePath={basePath} searchParams={sp} />
+        </div>
       </div>
+    </div>
+  );
+}
 
-      {result.data.length === 0 ? (
-        <div className="mt-10 flex flex-col items-center border border-line px-6 py-14 text-center">
-          <h2 className="text-[18px] font-bold text-ink">
-            {q ? `No ${category.name.toLowerCase()} products match “${q}”` : 'No products in this category yet'}
-          </h2>
-          <p className="mt-1.5 max-w-md text-[14px] text-ink-3">
-            {q ? 'Try a different search term or browse the whole category.' : 'Check back soon or browse the rest of the store.'}
-          </p>
-          <Link
-            href={q ? basePath : '/products'}
-            className="mt-6 inline-flex h-11 items-center rounded-sm border border-brand px-6 text-[14px] font-bold uppercase tracking-wide text-brand transition-colors hover:bg-brand-light"
-          >
-            {q ? `Browse all ${category.name}` : 'Browse all products'}
-          </Link>
-        </div>
-      ) : (
-        <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 xl:grid-cols-4">
-          {result.data.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
-      )}
-
-      <Pagination meta={result.meta} basePath={basePath} searchParams={sp} />
+function SidebarFallback() {
+  return (
+    <div className="flex flex-col gap-3 pr-5" aria-hidden="true">
+      <div className="h-8 w-24 animate-pulse rounded-sm bg-surface" />
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className="h-4 w-full animate-pulse rounded-sm bg-surface" />
+      ))}
     </div>
   );
 }

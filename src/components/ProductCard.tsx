@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import type { ProductSummary } from '@/lib/types';
 import { formatPrice } from '@/lib/format';
+import { useCartActions } from '@/context/CartContext';
+import { useWishlist } from '@/context/WishlistContext';
 import StarRating from './StarRating';
 import FadeImage from './FadeImage';
 
@@ -27,16 +29,19 @@ function HeartIcon({ filled }: { filled: boolean }) {
 }
 
 export default function ProductCard({ product }: { product: ProductSummary }) {
-  // Milestone 1 previews the interactions; persistence (cart, wishlist) ships in Milestone 2.
-  const [wishlisted, setWishlisted] = useState(false);
+  const { addItem } = useCartActions();
+  const { has, toggle, isHydrated } = useWishlist();
   const [justAdded, setJustAdded] = useState(false);
   const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wishlisted = isHydrated && has(product.id);
 
   useEffect(() => () => {
     if (addedTimer.current) clearTimeout(addedTimer.current);
   }, []);
 
   const quickAdd = () => {
+    const result = addItem(product.id);
+    if (!result.ok) return;
     setJustAdded(true);
     if (addedTimer.current) clearTimeout(addedTimer.current);
     addedTimer.current = setTimeout(() => setJustAdded(false), 1100);
@@ -52,7 +57,7 @@ export default function ProductCard({ product }: { product: ProductSummary }) {
   const onWishlist = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setWishlisted((w) => !w);
+    toggle(product.id);
   };
 
   return (
@@ -105,7 +110,6 @@ export default function ProductCard({ product }: { product: ProductSummary }) {
             type="button"
             aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
             aria-pressed={wishlisted}
-            title="Wishlist syncing arrives in Milestone 2"
             onClick={onWishlist}
             className={`absolute right-2 top-2 hidden h-8 w-8 items-center justify-center rounded-full bg-white/95 shadow-[0_1px_3px_rgba(40,44,63,0.2)] pointer-coarse:flex ${
               wishlisted ? 'text-brand' : 'text-ink-2'
@@ -135,7 +139,6 @@ export default function ProductCard({ product }: { product: ProductSummary }) {
         {!outOfStock && (
           <button
             type="button"
-            title="Cart ships in Milestone 2"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -167,7 +170,6 @@ export default function ProductCard({ product }: { product: ProductSummary }) {
           type="button"
           aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
           aria-pressed={wishlisted}
-          title="Wishlist syncing arrives in Milestone 2"
           onClick={onWishlist}
           className={`flex h-9 w-full items-center justify-center gap-1.5 rounded-sm border text-[12px] font-bold uppercase tracking-wide transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${
             wishlisted

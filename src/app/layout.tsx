@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BackToTop from "@/components/BackToTop";
 import PageProgress from "@/components/PageProgress";
+import Providers from "./providers";
 import { getCategories } from "@/lib/api";
 
 const figtree = Figtree({
@@ -28,11 +29,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${figtree.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-canvas text-ink">
-        <PageProgress />
-        <Header categories={categories} />
-        <main className="flex-1">{children}</main>
-        <Footer />
-        <BackToTop />
+        <Providers>
+          <PageProgress />
+          <Header categories={categories} />
+          <main className="flex-1">{children}</main>
+          <Footer />
+          <BackToTop />
+        </Providers>
       </body>
     </html>
   );

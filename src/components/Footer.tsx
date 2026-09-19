@@ -13,6 +13,14 @@ const ONLINE_SHOPPING = [
   { href: '/products', label: 'All Products' },
 ];
 
+const MY_ACCOUNT = [
+  { href: '/login', label: 'Sign in' },
+  { href: '/register', label: 'Create account' },
+  { href: '/account/orders', label: 'My orders' },
+  { href: '/wishlist', label: 'Wishlist' },
+  { href: '/cart', label: 'Bag' },
+];
+
 const CUSTOMER_POLICIES = [
   'Contact Us',
   'FAQ',
@@ -147,11 +155,12 @@ export default function Footer() {
       </div>
 
       <div className="mx-auto max-w-7xl px-4 pb-8 pt-12 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3 lg:grid-cols-[1fr_1fr_1fr_1.4fr]">
           <FooterColumn title="Online Shopping" links={ONLINE_SHOPPING} />
+          <FooterColumn title="My Account" links={MY_ACCOUNT} />
           <FooterColumn title="Customer Policies" links={CUSTOMER_POLICIES} />
 
-          <div className="sm:col-span-2 lg:col-span-1">
+          <div className="col-span-2 sm:col-span-3 lg:col-span-1">
             <h4 className={HEADING_CLASS}>Keep in Touch</h4>
             <div className="mt-4 flex gap-2.5">
               {SOCIALS.map((s) => (

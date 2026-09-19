@@ -1,8 +1,14 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type { ProductVariant } from '@/lib/types';
 import { formatPrice } from '@/lib/format';
+import { buildLoginHref } from '@/lib/safeRedirect';
+import { useAuth } from '@/context/AuthContext';
+import { toast } from '@/context/ToastContext';
+import { useCart } from '@/context/CartContext';
+import { useWishlist } from '@/context/WishlistContext';
 
 function BagIcon({ className = '' }: { className?: string }) {
   return (
@@ -61,7 +67,7 @@ function RulerIcon({ className = '' }: { className?: string }) {
   );
 }
 
-/** Share (Web Share API or clipboard fallback) + Size guide. UI only in Milestone 1. */
+/** Share (Web Share API or clipboard fallback) + Size guide. */
 function ShareRow() {
   const [copied, setCopied] = useState(false);
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -107,7 +113,6 @@ function ShareRow() {
       </button>
       <button
         type="button"
-        title="Size guide arrives with Milestone 2"
         className="inline-flex items-center gap-1.5 rounded-sm outline-none transition-colors duration-150 hover:text-brand focus-visible:ring-2 focus-visible:ring-brand/40"
       >
         <RulerIcon className="h-4 w-4" />
@@ -120,7 +125,7 @@ function ShareRow() {
   );
 }
 
-/** Pincode check is UI only in Milestone 1: it validates the format and shows an inline confirmation. */
+/** Pincode check is a demo: it validates the format, shows an inline confirmation and a toast. */
 function DeliveryCheck() {
   const [pincode, setPincode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -135,7 +140,12 @@ function DeliveryCheck() {
       return;
     }
     setError(null);
-    setChecked(value.toUpperCase());
+    const code = value.toUpperCase();
+    setChecked(code);
+    toast.success('Delivery available', {
+      id: 'delivery-check',
+      description: `Get it delivered to ${code} in 3–5 business days. Free shipping over $50.`,
+    });
   };
 
   return (
@@ -240,25 +250,30 @@ function VariantChip({
 }
 
 export default function ProductActions({
+  productId,
   basePrice,
   compareAtPrice = null,
   stock,
   variants,
 }: {
+  productId: string;
   basePrice: number;
   compareAtPrice?: number | null;
   stock: number;
   variants: ProductVariant[];
 }) {
+  const router = useRouter();
+  const { status } = useAuth();
+  const { addItem } = useCart();
+  const wishlist = useWishlist();
   const attributeKey = variants[0] ? Object.keys(variants[0].attributes)[0] : null;
   const [selectedValue, setSelectedValue] = useState<string | null>(
     attributeKey ? variants[0].attributes[attributeKey] : null,
   );
   const [quantity, setQuantity] = useState(1);
-  // Milestone 1 previews the interactions; cart, checkout and wishlist persistence ship in Milestone 2.
   const [justAdded, setJustAdded] = useState(false);
-  const [wishlisted, setWishlisted] = useState(false);
   const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wishlisted = wishlist.isHydrated && wishlist.has(productId);
 
   useEffect(() => () => {
     if (addedTimer.current) clearTimeout(addedTimer.current);
@@ -288,9 +303,21 @@ export default function ProductActions({
   };
 
   const handleAddToBag = () => {
+    const result = addItem(productId, selectedVariant?.id ?? null, displayQuantity);
+    if (!result.ok) return;
     setJustAdded(true);
     if (addedTimer.current) clearTimeout(addedTimer.current);
     addedTimer.current = setTimeout(() => setJustAdded(false), 1200);
+  };
+
+  const handleBuyNow = () => {
+    if (status === 'loading') return;
+    const result = addItem(productId, selectedVariant?.id ?? null, displayQuantity, { silent: true });
+    if (!result.ok) {
+      toast.error(result.message ?? 'Could not add to bag');
+      return;
+    }
+    router.push(status === 'authenticated' ? '/checkout' : buildLoginHref('/checkout'));
   };
 
   return (
@@ -372,7 +399,6 @@ export default function ProductActions({
           <button
             type="button"
             disabled={outOfStock}
-            title="Cart & checkout ship in Milestone 2"
             onClick={handleAddToBag}
             className={`flex h-[54px] flex-1 items-center justify-center gap-2.5 rounded-sm text-[14px] font-bold uppercase tracking-wide text-white transition-colors duration-150 disabled:cursor-not-allowed disabled:bg-ink-4 ${
               justAdded ? 'bg-success' : 'bg-brand hover:bg-brand-dark'
@@ -383,10 +409,9 @@ export default function ProductActions({
           </button>
           <button
             type="button"
-            onClick={() => setWishlisted((w) => !w)}
+            onClick={() => wishlist.toggle(productId)}
             aria-pressed={wishlisted}
             aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-            title="Wishlist syncing arrives in Milestone 2"
             className={`flex h-[54px] flex-1 items-center justify-center gap-2.5 rounded-sm border text-[14px] font-bold uppercase tracking-wide transition-colors duration-150 ${
               wishlisted ? 'border-brand bg-brand-light text-brand' : 'border-line-strong bg-white text-ink hover:border-ink'
             }`}
@@ -397,16 +422,12 @@ export default function ProductActions({
         </div>
         <button
           type="button"
-          disabled={outOfStock}
-          title="Cart & checkout ship in Milestone 2"
-          onClick={handleAddToBag}
+          disabled={outOfStock || status === 'loading'}
+          onClick={handleBuyNow}
           className="flex h-[48px] w-full items-center justify-center rounded-sm border border-line-strong bg-white text-[14px] font-bold uppercase tracking-wide text-ink transition-colors duration-150 hover:border-ink disabled:cursor-not-allowed disabled:border-line disabled:text-ink-4"
         >
           Buy now
         </button>
-        <p className="text-[12px] text-ink-3">
-          Cart, checkout and wishlist persistence are part of Milestone 2 — this page previews the interactions.
-        </p>
         <ShareRow />
       </div>
 
