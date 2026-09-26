@@ -8,10 +8,12 @@ import {
   getVariantLabel,
   resolveCartVariant,
 } from '../catalog';
-import { normalizeCouponCode, validateCoupon, type CouponValidation } from '../coupons';
+import { normalizeCouponCode, type Coupon, type CouponValidation } from '../coupons';
 import type { ProductRecord, ProductVariantRecord } from '../mockTypes';
 import { calculateTotals, lineTotal, roundMoney, type CartTotals } from '../pricing';
 import { GUEST_OWNER, getJsonStore, isRecord, sanitizeArray, storageKeys } from '../storage';
+import { lookupProduct, type CatalogSnapshot } from './catalogStore';
+import { validateCoupon } from './coupons';
 import type { AddToCartResult, CartItem, SetQuantityResult } from './types';
 
 export const OUT_OF_STOCK_MESSAGE = 'Out of stock';
@@ -239,11 +241,15 @@ export interface CartLine {
   exceedsStock: boolean;
 }
 
-/** Joins stored cart items with catalog data; items whose product/variant no longer resolves are dropped. */
-export function buildCartLines(items: readonly CartItem[]): CartLine[] {
+/**
+ * Joins stored cart items with the effective catalog; items whose product/variant no longer resolves
+ * (deleted, unpublished) are dropped. Pass `catalog` (a useCatalog / getCatalog snapshot) from React
+ * so the result re-computes when the admin edits prices or stock.
+ */
+export function buildCartLines(items: readonly CartItem[], catalog?: CatalogSnapshot): CartLine[] {
   const lines: CartLine[] = [];
   for (const item of items) {
-    const product = getProductById(item.productId);
+    const product = catalog ? lookupProduct(catalog, item.productId) : getProductById(item.productId);
     if (!product) continue;
     let variant: ProductVariantRecord | null = null;
     if (product.variants.length > 0) {
@@ -299,14 +305,22 @@ export interface CartSummary {
   couponValidation: CouponValidation | null;
 }
 
+export interface CartSources {
+  /** Coupon list to evaluate against (defaults to the live coupons store). */
+  coupons?: readonly Coupon[];
+  /** Catalog snapshot to price against (defaults to the live effective catalog). */
+  catalog?: CatalogSnapshot;
+}
+
 export function summarizeCart(
   items: readonly CartItem[],
   couponCode: string | null,
   now: number = Date.now(),
+  sources: CartSources = {},
 ): CartSummary {
-  const lines = buildCartLines(items);
+  const lines = buildCartLines(items, sources.catalog);
   const subtotal = calculateTotals(lines).subtotal;
-  const couponValidation = couponCode ? validateCoupon(couponCode, subtotal, now) : null;
+  const couponValidation = couponCode ? validateCoupon(couponCode, subtotal, now, sources.coupons) : null;
   const totals = calculateTotals(lines, couponValidation?.ok ? couponValidation.coupon : null);
   return { lines, totals, couponValidation };
 }

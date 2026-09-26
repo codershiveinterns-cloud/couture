@@ -1,13 +1,15 @@
-import { getCategories, getProducts } from '@/lib/api';
+import { getCategories, getProducts, type ProductQuery } from '@/lib/api';
 import Reveal from '@/components/Reveal';
 import CouponBanner from '@/components/home/CouponBanner';
 import HeroCarousel, { type HeroSlide } from '@/components/home/HeroCarousel';
 import DealsStrip from '@/components/home/DealsStrip';
-import CategoryGrid from '@/components/home/CategoryGrid';
-import DealsRail from '@/components/home/DealsRail';
 import FeaturedBento from '@/components/home/FeaturedBento';
-import TrendingBrands from '@/components/home/TrendingBrands';
-import ProductRail from '@/components/home/ProductRail';
+import {
+  LiveCategoryGrid,
+  LiveDealsRail,
+  LiveProductRail,
+  LiveTrendingBrands,
+} from '@/components/storefront/LiveHomeSections';
 import TrustRow from '@/components/home/TrustRow';
 import Testimonials from '@/components/home/Testimonials';
 import NewsletterBand from '@/components/home/NewsletterBand';
@@ -48,11 +50,15 @@ const HERO_SLIDES: HeroSlide[] = [
   },
 ];
 
+// The same queries are re-run client-side against the admin-edited catalog (see LiveHomeSections).
+const FEATURED_QUERY: ProductQuery = { featured: true, pageSize: 8 };
+const POPULAR_QUERY: ProductQuery = { sort: 'popularity', pageSize: 8 };
+
 export default async function HomePage() {
   const [categories, featured, popular] = await Promise.all([
     getCategories(),
-    getProducts({ featured: true, pageSize: 8 }),
-    getProducts({ sort: 'popularity', pageSize: 8 }),
+    getProducts(FEATURED_QUERY),
+    getProducts(POPULAR_QUERY),
   ]);
 
   return (
@@ -68,11 +74,11 @@ export default async function HomePage() {
       </Reveal>
 
       <Reveal>
-        <CategoryGrid categories={categories} />
+        <LiveCategoryGrid categories={categories} />
       </Reveal>
 
       <Reveal>
-        <DealsRail products={featured.data} href="/products?featured=true" />
+        <LiveDealsRail products={featured.data} query={FEATURED_QUERY} href="/products?featured=true" />
       </Reveal>
 
       <Reveal>
@@ -80,11 +86,11 @@ export default async function HomePage() {
       </Reveal>
 
       <Reveal>
-        <TrendingBrands products={popular.data} />
+        <LiveTrendingBrands products={popular.data} query={POPULAR_QUERY} />
       </Reveal>
 
       <Reveal>
-        <ProductRail title="Top Picks" href="/products?sort=popularity" products={popular.data} layout="grid" />
+        <LiveProductRail title="Top Picks" href="/products?sort=popularity" products={popular.data} query={POPULAR_QUERY} layout="grid" />
       </Reveal>
 
       <Reveal>

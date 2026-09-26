@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import Logo from '@/components/Logo';
 
@@ -134,6 +135,10 @@ const PROMISES = [
 
 export default function Footer() {
   const [subscribed, setSubscribed] = useState(false);
+  const pathname = usePathname();
+
+  // The admin area ships its own chrome.
+  if (pathname.startsWith('/admin')) return null;
 
   return (
     <footer className="mt-16 bg-surface text-ink">

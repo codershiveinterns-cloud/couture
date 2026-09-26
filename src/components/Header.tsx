@@ -44,7 +44,7 @@ interface NavItem {
 export default function Header({ categories }: { categories: CategorySummary[] }) {
   const pathname = usePathname();
   const scrolled = useScrolledPast(8);
-  const { user, status, logout } = useAuth();
+  const { user, status, logout, isAdmin } = useAuth();
   const { itemCount, isHydrated: cartHydrated } = useCart();
   const { count: wishlistCount, isHydrated: wishlistHydrated } = useWishlist();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -121,6 +121,9 @@ export default function Header({ categories }: { categories: CategorySummary[] }
   const showWishlistBadge = wishlistHydrated && wishlistCount > 0;
   const showCartBadge = cartHydrated && itemCount > 0;
   const menuTab = accountOpen ? 0 : -1;
+
+  // The admin area ships its own chrome.
+  if (pathname.startsWith('/admin')) return null;
 
   return (
     <header
@@ -286,6 +289,11 @@ export default function Header({ categories }: { categories: CategorySummary[] }
                           {link.label}
                         </MenuLink>
                       ))}
+                      {isAdmin && (
+                        <MenuLink href="/admin" onClick={closeAll} tabIndex={menuTab}>
+                          Admin
+                        </MenuLink>
+                      )}
                     </div>
                     <div className="border-t border-line py-1.5">
                       <button
@@ -397,6 +405,11 @@ export default function Header({ categories }: { categories: CategorySummary[] }
                     {link.label}
                   </Link>
                 ))}
+                {isAdmin && (
+                  <Link href="/admin" onClick={() => setMenuOpen(false)} className="border-b border-line py-3 text-ink-2 transition-colors hover:text-ink">
+                    Admin
+                  </Link>
+                )}
                 <Link href="/cart" onClick={() => setMenuOpen(false)} className="border-b border-line py-3 text-ink-2 transition-colors hover:text-ink">
                   Bag
                 </Link>

@@ -28,6 +28,8 @@ export interface ProductVariantRecord {
   isActive: boolean;
 }
 
+export type ProductStatus = 'published' | 'draft';
+
 export interface ProductRecord {
   id: string;
   name: string;
@@ -48,4 +50,7 @@ export interface ProductRecord {
   images: ProductImageRecord[];
   variants: ProductVariantRecord[];
   createdAt: string;
+  /** Missing on the static base records, which are treated as 'published'. The catalog store always sets it. */
+  status?: ProductStatus;
+  updatedAt?: string;
 }

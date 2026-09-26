@@ -7,6 +7,16 @@ export const storageKeys = {
   session: `${STORAGE_PREFIX}session`,
   resetTokens: `${STORAGE_PREFIX}resetTokens`,
   reviews: `${STORAGE_PREFIX}reviews`,
+  /** Moderation of generated (seeded) reviews: id -> 'hidden' | 'deleted'. */
+  reviewModeration: `${STORAGE_PREFIX}reviewModeration`,
+  catalogProducts: `${STORAGE_PREFIX}catalog:products`,
+  catalogDeletedProducts: `${STORAGE_PREFIX}catalog:deletedProducts`,
+  catalogCategories: `${STORAGE_PREFIX}catalog:categories`,
+  catalogDeletedCategories: `${STORAGE_PREFIX}catalog:deletedCategories`,
+  coupons: `${STORAGE_PREFIX}coupons`,
+  payments: `${STORAGE_PREFIX}payments`,
+  /** Prefix shared by every per-user orders key (see subscribePrefix). */
+  ordersPrefix: `${STORAGE_PREFIX}orders:`,
   cart: (owner: string) => `${STORAGE_PREFIX}cart:${owner}`,
   coupon: (owner: string) => `${STORAGE_PREFIX}coupon:${owner}`,
   wishlist: (owner: string) => `${STORAGE_PREFIX}wishlist:${owner}`,
@@ -81,16 +91,20 @@ export function writeJSON<T>(key: string, value: T): void {
 }
 
 const listeners = new Map<string, Set<() => void>>();
+const prefixListeners = new Map<string, Set<() => void>>();
 let windowListenersAttached = false;
 
 function emit(key: string) {
   const set = listeners.get(key);
-  if (!set) return;
-  [...set].forEach((cb) => cb());
+  if (set) [...set].forEach((cb) => cb());
+  [...prefixListeners.entries()].forEach(([prefix, callbacks]) => {
+    if (key.startsWith(prefix)) [...callbacks].forEach((cb) => cb());
+  });
 }
 
 function emitAll() {
-  [...listeners.keys()].forEach(emit);
+  [...listeners.values()].forEach((set) => [...set].forEach((cb) => cb()));
+  [...prefixListeners.values()].forEach((set) => [...set].forEach((cb) => cb()));
 }
 
 function attachWindowListeners() {
@@ -130,6 +144,47 @@ export function subscribeKey(key: string, callback: () => void): () => void {
 export function subscribeKeys(keys: readonly string[], callback: () => void): () => void {
   const unsubs = keys.map((key) => subscribeKey(key, callback));
   return () => unsubs.forEach((unsub) => unsub());
+}
+
+/** Fires for every key that starts with `prefix` (e.g. all per-user orders keys). */
+export function subscribePrefix(prefix: string, callback: () => void): () => void {
+  if (!isBrowser()) return () => {};
+  attachWindowListeners();
+  let set = prefixListeners.get(prefix);
+  if (!set) {
+    set = new Set();
+    prefixListeners.set(prefix, set);
+  }
+  set.add(callback);
+  return () => {
+    set.delete(callback);
+    if (set.size === 0) prefixListeners.delete(prefix);
+  };
+}
+
+/** Every persisted (or memory-held) key that starts with STORAGE_PREFIX. */
+export function listStorageKeys(): string[] {
+  if (!isBrowser()) return [];
+  const keys = new Set<string>();
+  memory.forEach((value, key) => {
+    if (value !== null) keys.add(key);
+  });
+  if (canUseLocalStorage()) {
+    try {
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (key && key.startsWith(STORAGE_PREFIX) && memory.get(key) !== null) keys.add(key);
+      }
+    } catch {
+      // ignore: fall back to whatever was collected
+    }
+  }
+  return [...keys];
+}
+
+/** Removes every `couture:v1:` key and notifies subscribers. */
+export function clearAllStorage(): void {
+  listStorageKeys().forEach((key) => writeRaw(key, null));
 }
 
 export interface JsonStore<T> {

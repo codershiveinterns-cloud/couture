@@ -17,7 +17,7 @@ import type {
   ResolvedProductQuery,
 } from './types';
 import { MOCK_CATEGORIES, MOCK_PRODUCTS } from './mockData';
-import type { ProductRecord } from './mockTypes';
+import type { CategoryRecord, ProductRecord } from './mockTypes';
 
 const MAX_PAGE_SIZE = 48;
 const DEFAULT_PAGE_SIZE = 12;
@@ -26,7 +26,7 @@ const DEFAULT_PAGE_SIZE = 12;
 // demo instead of resolving instantly — remove once this is a real fetch.
 const simulateLatency = () => new Promise((resolve) => setTimeout(resolve, 120));
 
-function toCategorySummary(cat: (typeof MOCK_CATEGORIES)[number]): CategorySummary {
+export function toCategorySummary(cat: CategoryRecord): CategorySummary {
   return {
     id: cat.id,
     name: cat.name,
@@ -37,7 +37,7 @@ function toCategorySummary(cat: (typeof MOCK_CATEGORIES)[number]): CategorySumma
   };
 }
 
-function toProductSummary(p: ProductRecord): ProductSummary {
+export function toProductSummary(p: ProductRecord): ProductSummary {
   return {
     id: p.id,
     name: p.name,
@@ -55,7 +55,7 @@ function toProductSummary(p: ProductRecord): ProductSummary {
   };
 }
 
-function toProductDetail(p: ProductRecord): ProductDetail {
+export function toProductDetail(p: ProductRecord): ProductDetail {
   return {
     id: p.id,
     name: p.name,
@@ -77,11 +77,20 @@ function toProductDetail(p: ProductRecord): ProductDetail {
   };
 }
 
+/** Base (static) products visible on the storefront. Admin overrides live in the browser: see services/catalogStore. */
+export function isPublished(p: ProductRecord): boolean {
+  return (p.status ?? 'published') === 'published';
+}
+
+const basePublishedProducts = (): ProductRecord[] => MOCK_PRODUCTS.filter(isPublished);
+
+export function listCategories(categories: readonly CategoryRecord[]): CategorySummary[] {
+  return [...categories].sort((a, b) => a.sortOrder - b.sortOrder).map(toCategorySummary);
+}
+
 export async function getCategories(): Promise<CategorySummary[]> {
   await simulateLatency();
-  return [...MOCK_CATEGORIES]
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map(toCategorySummary);
+  return listCategories(MOCK_CATEGORIES);
 }
 
 export async function getCategoryBySlug(slug: string): Promise<CategorySummary | null> {
@@ -197,13 +206,16 @@ function parseBoolean(value: string | undefined): boolean | undefined {
 }
 
 /** Turns raw URL params (page searchParams or URLSearchParams) into a ProductQuery, dropping anything invalid. */
-export function parseProductQuery(raw: RawParams): ProductQuery {
+export function parseProductQuery(
+  raw: RawParams,
+  categories: readonly Pick<CategoryRecord, 'slug'>[] = MOCK_CATEGORIES,
+): ProductQuery {
   const query: ProductQuery = {};
   const q = firstValue(raw, 'q');
   if (q && q.trim()) query.q = q.trim().slice(0, MAX_QUERY_LENGTH);
 
   const category = firstValue(raw, 'category');
-  if (category && MOCK_CATEGORIES.some((c) => c.slug === category)) query.category = category;
+  if (category && categories.some((c) => c.slug === category)) query.category = category;
 
   if (parseBoolean(firstValue(raw, 'featured'))) query.featured = true;
   if (parseBoolean(firstValue(raw, 'inStock'))) query.inStock = true;
@@ -243,8 +255,8 @@ function cleanNumber(value: unknown, min = 0): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value >= min ? value : null;
 }
 
-function resolveQuery(query: ProductQuery): ResolvedProductQuery {
-  const category = typeof query.category === 'string' && MOCK_CATEGORIES.some((c) => c.slug === query.category)
+function resolveQuery(query: ProductQuery, categories: readonly Pick<CategoryRecord, 'slug'>[]): ResolvedProductQuery {
+  const category = typeof query.category === 'string' && categories.some((c) => c.slug === query.category)
     ? query.category
     : null;
   const minRatingRaw = cleanNumber(query.minRating, 1);
@@ -301,15 +313,22 @@ function computeFacets(scope: readonly ProductRecord[]): ProductFacets {
   };
 }
 
-export async function getProducts(query: ProductQuery = {}): Promise<ProductSearchResult> {
-  await simulateLatency();
-
-  const resolved = resolveQuery(query ?? {});
+/**
+ * Pure query engine: search, filters, facets, sort and pagination over ANY product array.
+ * The server passes the published base catalog; client code can pass the effective
+ * (admin-edited) catalog from services/catalogStore. Callers decide which records are visible.
+ */
+export function queryProducts(
+  records: readonly ProductRecord[],
+  categories: readonly Pick<CategoryRecord, 'slug'>[],
+  query: ProductQuery = {},
+): ProductSearchResult {
+  const resolved = resolveQuery(query ?? {}, categories);
   const terms = tokenizeQuery(resolved.q);
 
   // Facets are computed over the search + category scope only, so selecting a
   // brand or colour does not make the other options disappear.
-  const scope = MOCK_PRODUCTS.filter(
+  const scope = records.filter(
     (p) =>
       (!resolved.category || p.categorySlug === resolved.category) &&
       (!resolved.featured || p.isFeatured) &&
@@ -342,18 +361,28 @@ export async function getProducts(query: ProductQuery = {}): Promise<ProductSear
   };
 }
 
+export async function getProducts(query: ProductQuery = {}): Promise<ProductSearchResult> {
+  await simulateLatency();
+  return queryProducts(basePublishedProducts(), MOCK_CATEGORIES, query);
+}
+
 export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
   await simulateLatency();
-  const product = MOCK_PRODUCTS.find((p) => p.slug === slug);
+  const product = basePublishedProducts().find((p) => p.slug === slug);
   return product ? toProductDetail(product) : null;
+}
+
+/** Up to `limit` other products from the same category as `slug`. */
+export function relatedFor(records: readonly ProductRecord[], slug: string, limit = 4): ProductSummary[] {
+  const product = records.find((p) => p.slug === slug);
+  if (!product) return [];
+  return records
+    .filter((p) => p.categorySlug === product.categorySlug && p.id !== product.id)
+    .slice(0, limit)
+    .map(toProductSummary);
 }
 
 export async function getRelatedProducts(slug: string): Promise<ProductSummary[]> {
   await simulateLatency();
-  const product = MOCK_PRODUCTS.find((p) => p.slug === slug);
-  if (!product) return [];
-
-  return MOCK_PRODUCTS.filter((p) => p.categorySlug === product.categorySlug && p.id !== product.id)
-    .slice(0, 4)
-    .map(toProductSummary);
+  return relatedFor(basePublishedProducts(), slug);
 }

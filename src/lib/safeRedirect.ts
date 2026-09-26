@@ -26,3 +26,9 @@ export function buildLoginHref(next?: string | null): string {
 export function buildRegisterHref(next?: string | null): string {
   return next && isSafeRedirect(next) ? `/register?next=${encodeURIComponent(next)}` : '/register';
 }
+
+export const ADMIN_HOME = '/admin';
+
+export function buildAdminLoginHref(next?: string | null): string {
+  return next && isSafeRedirect(next) ? `/admin/login?next=${encodeURIComponent(next)}` : '/admin/login';
+}

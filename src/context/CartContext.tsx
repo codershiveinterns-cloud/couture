@@ -1,8 +1,9 @@
 'use client';
 
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from 'react';
+import { useJsonStore } from '@/hooks/useJsonStore';
 import { getProductById, getVariant, getVariantLabel } from '@/lib/catalog';
-import { validateCoupon, type CouponValidation } from '@/lib/coupons';
+import type { CouponValidation } from '@/lib/coupons';
 import type { CartTotals } from '@/lib/pricing';
 import {
   addToCart,
@@ -18,6 +19,8 @@ import {
   summarizeCart,
   type CartLine,
 } from '@/lib/services/cart';
+import { getCatalog, getServerCatalog, subscribeCatalog } from '@/lib/services/catalogStore';
+import { couponsStore, validateCoupon } from '@/lib/services/coupons';
 import type { AddToCartResult, CartItem, SetQuantityResult } from '@/lib/services/types';
 import { useAuth } from './AuthContext';
 import { toast } from './ToastContext';
@@ -107,7 +110,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const codeStore = useMemo(() => couponStore(ownerId), [ownerId]);
   const items = useSyncExternalStore(itemsStore.subscribe, itemsStore.get, itemsStore.getServerSnapshot);
   const couponCode = useSyncExternalStore(codeStore.subscribe, codeStore.get, codeStore.getServerSnapshot);
-  const { lines, totals, couponValidation } = useMemo(() => summarizeCart(items, couponCode), [items, couponCode]);
+  // Admin edits (prices, stock, publish state, coupons) live in the same storage: re-price when they change.
+  const catalog = useSyncExternalStore(subscribeCatalog, getCatalog, getServerCatalog);
+  const allCoupons = useJsonStore(couponsStore());
+  const { lines, totals, couponValidation } = useMemo(
+    () => summarizeCart(items, couponCode, undefined, { catalog, coupons: allCoupons }),
+    [items, couponCode, catalog, allCoupons],
+  );
 
   useEffect(() => {
     if (lines.length !== items.length) pruneCart(ownerId);

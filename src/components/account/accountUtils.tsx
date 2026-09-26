@@ -1,20 +1,25 @@
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
 import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from '@/lib/services/orders';
-import type { OrderStatus, PaymentStatus } from '@/lib/services/types';
+import type { OrderStatus, PaymentMethod, PaymentStatus } from '@/lib/services/types';
 
-// Myntra-style: positive states green, cancelled pink, everything else neutral grey.
-const ORDER_STATUS_VARIANTS: Record<OrderStatus, BadgeVariant> = {
-  PLACED: 'success',
-  CONFIRMED: 'neutral',
-  SHIPPED: 'neutral',
+// Shared tone mapping (same as the admin screens): early states info, in-transit warning,
+// delivered success, cancelled danger, refunded neutral.
+export const ORDER_STATUS_VARIANTS: Record<OrderStatus, BadgeVariant> = {
+  PLACED: 'info',
+  CONFIRMED: 'info',
+  PROCESSING: 'warning',
+  SHIPPED: 'warning',
+  OUT_FOR_DELIVERY: 'warning',
   DELIVERED: 'success',
   CANCELLED: 'danger',
+  REFUNDED: 'neutral',
 };
 
-const PAYMENT_STATUS_VARIANTS: Record<PaymentStatus, BadgeVariant> = {
-  PENDING: 'neutral',
+export const PAYMENT_STATUS_VARIANTS: Record<PaymentStatus, BadgeVariant> = {
+  PENDING: 'warning',
   PAID: 'success',
   FAILED: 'danger',
+  CANCELLED: 'neutral',
   REFUNDED: 'neutral',
 };
 
@@ -45,12 +50,18 @@ export function OrderStatusBadge({ status }: { status: OrderStatus }) {
   );
 }
 
-export function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
+/** `method` tweaks the wording for unpaid cash orders ("Pay on delivery" instead of "Pending"). */
+export function PaymentStatusBadge({ status, method }: { status: PaymentStatus; method?: PaymentMethod }) {
   return (
     <Badge variant={PAYMENT_STATUS_VARIANTS[status] ?? 'neutral'} size="sm">
-      {PAYMENT_STATUS_LABELS[status] ?? status}
+      {paymentStatusLabel(status, method)}
     </Badge>
   );
+}
+
+export function paymentStatusLabel(status: PaymentStatus, method?: PaymentMethod): string {
+  if (status === 'PENDING' && method === 'COD') return 'Pay on delivery';
+  return PAYMENT_STATUS_LABELS[status] ?? status;
 }
 
 /** Right-hand account panel: white, thin border, squared corners, uppercase section label. */

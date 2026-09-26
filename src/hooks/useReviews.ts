@@ -6,8 +6,12 @@ import {
   deleteReview,
   getSeededReviews,
   getUserReviewsForProduct,
+  isReviewPublished,
+  moderatedSeededCount,
+  reviewModerationStore,
   reviewsStore,
   submitReview,
+  visibleSeededReviews,
 } from '@/lib/services/reviews';
 import type { Review, ReviewSummary, ReviewView, ServiceResult } from '@/lib/services/types';
 import type { ReviewInput } from '@/lib/validation';
@@ -37,20 +41,31 @@ export function useReviews({ productId, avgRating, reviewCount }: UseReviewsPara
   const { user, isHydrated } = useAuth();
   const store = reviewsStore();
   const allUserReviews = useSyncExternalStore(store.subscribe, store.get, store.getServerSnapshot);
+  const moderationStore = reviewModerationStore();
+  const moderation = useSyncExternalStore(
+    moderationStore.subscribe,
+    moderationStore.get,
+    moderationStore.getServerSnapshot,
+  );
   const userId = user?.id ?? null;
 
-  const seeded = useMemo(() => getSeededReviews(productId, avgRating, reviewCount), [productId, avgRating, reviewCount]);
+  const allSeeded = useMemo(() => getSeededReviews(productId, avgRating, reviewCount), [productId, avgRating, reviewCount]);
+  const seeded = useMemo(() => visibleSeededReviews(allSeeded, moderation), [allSeeded, moderation]);
+  const baseCount = Math.max(0, reviewCount - moderatedSeededCount(allSeeded, moderation));
+  // Includes the shopper's own hidden review (so they cannot post twice); lists and summary use published only.
   const productUserReviews = useMemo(
     () => getUserReviewsForProduct(productId, allUserReviews),
     [productId, allUserReviews],
   );
+  const publishedUserReviews = useMemo(() => productUserReviews.filter(isReviewPublished), [productUserReviews]);
   const reviews = useMemo(
-    () => buildReviewList(seeded, productUserReviews, userId),
-    [seeded, productUserReviews, userId],
+    () => buildReviewList(seeded, publishedUserReviews, userId),
+    [seeded, publishedUserReviews, userId],
   );
   const summary = useMemo(
-    () => computeReviewSummary({ avgRating, reviewCount, userReviews: productUserReviews, visibleReviews: reviews }),
-    [avgRating, reviewCount, productUserReviews, reviews],
+    () =>
+      computeReviewSummary({ avgRating, reviewCount: baseCount, userReviews: publishedUserReviews, visibleReviews: reviews }),
+    [avgRating, baseCount, publishedUserReviews, reviews],
   );
 
   return useMemo<UseReviewsResult>(() => {

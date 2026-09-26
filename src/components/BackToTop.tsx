@@ -1,15 +1,19 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useScrolledPast } from '@/components/header/useScrolledPast';
 
 /** Circular "scroll to top" button that appears once the page has scrolled 600px. */
 export default function BackToTop() {
   const visible = useScrolledPast(600);
+  const pathname = usePathname();
 
   const scrollToTop = () => {
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
   };
+
+  if (pathname.startsWith('/admin')) return null;
 
   return (
     <button

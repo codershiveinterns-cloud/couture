@@ -16,6 +16,7 @@ import {
   clearExpiredSession,
   createAccount,
   endSession,
+  ensureAdminSeeded,
   getAuthSnapshot,
   getServerAuthSnapshot,
   requestPasswordReset as requestPasswordResetService,
@@ -23,6 +24,7 @@ import {
   startSession,
   subscribeAuth,
   updateProfile as updateProfileService,
+  verifyAdminCredentials,
   verifyCredentials,
 } from '@/lib/services/auth';
 import { mergeGuestCartInto } from '@/lib/services/cart';
@@ -49,11 +51,15 @@ export interface AuthContextValue {
   /** 'loading' until hydrated; never trust user === null before then. */
   status: AuthStatus;
   isAuthenticated: boolean;
+  /** true when the signed-in user has role 'admin' (always false while loading). */
+  isAdmin: boolean;
   isHydrated: boolean;
   /** Storage owner for cart/wishlist/coupon: the user id, or "guest". */
   ownerId: string;
   session: Session | null;
   login(input: LoginInput): Promise<ServiceResult<User>>;
+  /** Admin sign in: rejects non-admin accounts without starting a session (guest bag/wishlist are NOT merged). */
+  loginAdmin(input: LoginInput): Promise<ServiceResult<User>>;
   register(input: RegisterInput): Promise<ServiceResult<User>>;
   logout(options?: LogoutOptions): void;
   requestPasswordReset(email: string): Promise<ServiceResult<ForgotPasswordResult>>;
@@ -101,6 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     clearExpiredSession();
+    ensureAdminSeeded();
   }, []);
 
   useEffect(() => {
@@ -117,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       status,
       isAuthenticated: status === 'authenticated',
+      isAdmin: status === 'authenticated' && user?.role === 'admin',
       isHydrated: hydrated,
       ownerId: userId ?? GUEST_OWNER,
       session,
@@ -126,6 +134,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           adoptGuestData(result.data.id);
           startSession(result.data.id);
         }
+        return result;
+      },
+      loginAdmin: async (input) => {
+        const result = await verifyAdminCredentials(input);
+        if (result.ok) startSession(result.data.id);
         return result;
       },
       register: async (input) => {

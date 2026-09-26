@@ -8,15 +8,24 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Spinner } from '@/components/ui/Spinner';
 import { useAuth } from '@/context/AuthContext';
+import { useOrderPayment } from '@/hooks/useAllOrders';
 import { useOrder } from '@/hooks/useOrders';
 import { formatAddressLines } from '@/lib/services/addresses';
 import { ORDER_STATUS_LABELS, PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS } from '@/lib/services/orders';
+import { describePaymentInstrument } from '@/lib/services/payments';
+import { ORDER_STATUS_VARIANTS, PAYMENT_STATUS_VARIANTS } from '@/components/account/accountUtils';
 import { OrderItemsList } from './OrderItemsList';
 
-const NEXT_STEPS = [
+const NEXT_STEPS_COD = [
   'We’re preparing your items and will confirm the order shortly.',
   'You can track the status anytime from your account’s orders page.',
   'Have the exact amount ready — payment is collected in cash on delivery.',
+];
+
+const NEXT_STEPS_PAID = [
+  'Your payment is confirmed and the order is now being prepared.',
+  'You can track the status anytime from your account’s orders page.',
+  'Nothing more to pay — just be available to receive the delivery.',
 ];
 
 const PANEL = 'rounded-sm border border-line bg-white p-4 sm:p-5';
@@ -33,6 +42,7 @@ function SuccessContent() {
   const searchParams = useSearchParams();
   const orderNumber = searchParams.get('order');
   const { order, isReady } = useOrder(orderNumber);
+  const payment = useOrderPayment(order?.orderNumber ?? null);
   const { user } = useAuth();
 
   if (!isReady) {
@@ -65,6 +75,11 @@ function SuccessContent() {
   }
 
   const addressLines = formatAddressLines(order.address);
+  const isPaid = order.paymentStatus === 'PAID';
+  const awaitingCod = order.paymentMethod === 'COD' && order.paymentStatus === 'PENDING';
+  const paymentLabel = awaitingCod ? 'Pay on delivery' : PAYMENT_STATUS_LABELS[order.paymentStatus];
+  const instrument = payment ? describePaymentInstrument(payment) : PAYMENT_METHOD_LABELS[order.paymentMethod];
+  const nextSteps = isPaid ? NEXT_STEPS_PAID : NEXT_STEPS_COD;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_380px] lg:items-start">
@@ -76,7 +91,7 @@ function SuccessContent() {
                 <path d="M20 6 9 17l-5-5" />
               </svg>
             </span>
-            <h1 className="mt-5 text-[22px] font-bold text-ink sm:text-[24px]">Order placed successfully!</h1>
+            <h1 className="mt-5 text-[22px] font-bold text-ink sm:text-[24px]">{isPaid ? 'Payment received — order confirmed!' : 'Order placed successfully!'}</h1>
             <p className="mt-2 text-[14px] text-ink-2">
               Order number <span className="font-bold text-ink">{order.orderNumber}</span> · {formatDate(order.createdAt)}
             </p>
@@ -86,13 +101,16 @@ function SuccessContent() {
               </p>
             )}
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-              <Badge variant="success" dot>
+              <Badge variant={ORDER_STATUS_VARIANTS[order.status]} dot>
                 {ORDER_STATUS_LABELS[order.status]}
               </Badge>
-              <Badge variant="warning" dot>
-                Payment {PAYMENT_STATUS_LABELS[order.paymentStatus]}
+              <Badge variant={PAYMENT_STATUS_VARIANTS[order.paymentStatus]} dot>
+                {paymentLabel}
               </Badge>
             </div>
+            <p className="mt-3 text-[13px] text-ink-2">
+              {isPaid ? 'Paid with' : 'Payment'}: <span className="font-bold text-ink">{instrument}</span>
+            </p>
           </div>
 
           <div className="mt-8 flex flex-col gap-2 sm:flex-row sm:justify-center">
@@ -117,7 +135,7 @@ function SuccessContent() {
             What happens next
           </h2>
           <ol className="space-y-2.5 text-[13px] text-ink-2">
-            {NEXT_STEPS.map((text, index) => (
+            {nextSteps.map((text, index) => (
               <li key={text} className="flex gap-3">
                 <span aria-hidden="true" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface text-[11px] font-bold text-ink">
                   {index + 1}
@@ -142,9 +160,26 @@ function SuccessContent() {
             total={order.totals.total}
             couponCode={order.couponCode}
           />
-          <p className="mt-4 border-t border-line pt-4 text-[12px] text-ink-3">
-            Payment method: <span className="font-bold text-ink-2">{PAYMENT_METHOD_LABELS[order.paymentMethod]}</span>
-          </p>
+          <dl className="mt-4 flex flex-col gap-1.5 border-t border-line pt-4 text-[12px] text-ink-3">
+            <div className="flex items-center justify-between gap-3">
+              <dt>Payment method</dt>
+              <dd className="text-right font-bold text-ink-2">{instrument}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt>Payment status</dt>
+              <dd>
+                <Badge variant={PAYMENT_STATUS_VARIANTS[order.paymentStatus]} size="sm">
+                  {paymentLabel}
+                </Badge>
+              </dd>
+            </div>
+            {payment?.reference && (
+              <div className="flex items-center justify-between gap-3">
+                <dt>Reference</dt>
+                <dd className="break-all text-right font-medium tabular-nums text-ink-2">{payment.reference}</dd>
+              </div>
+            )}
+          </dl>
         </section>
 
         <section aria-labelledby="success-address" className={PANEL}>

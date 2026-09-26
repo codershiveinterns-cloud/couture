@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { PriceDetails } from '@/components/cart/PriceDetails';
 import { Button } from '@/components/ui/Button';
@@ -11,11 +11,15 @@ import { Spinner } from '@/components/ui/Spinner';
 import { useCart } from '@/context/CartContext';
 import { useAddresses } from '@/hooks/useAddresses';
 import { useOrders } from '@/hooks/useOrders';
+import { cardDigits, detectCardBrand, EMPTY_CARD, maskUpiId, type CardDetails, type PaymentField } from '@/lib/payments/cards';
+import { validatePaymentInput, type CheckoutPaymentInput } from '@/lib/services/orders';
 import type { PaymentMethod } from '@/lib/services/types';
+import type { FieldErrors } from '@/lib/validation';
 import { CheckoutHeader, type CheckoutStage } from './CheckoutHeader';
 import { CheckoutStepper, type CheckoutStep } from './CheckoutStepper';
+import { PaymentProcessing, type PaymentStage } from './PaymentProcessing';
 import { PaymentStep } from './PaymentStep';
-import { ReviewStep } from './ReviewStep';
+import { ReviewStep, type CheckoutNotice } from './ReviewStep';
 import { ShippingStep } from './ShippingStep';
 
 interface CheckoutFlowProps {
@@ -27,12 +31,29 @@ function CheckoutFlow({ step, onStepChange }: CheckoutFlowProps) {
   const router = useRouter();
   const cart = useCart();
   const { addresses, defaultAddress, isReady: addressesReady } = useAddresses();
-  const { placeOrder } = useOrders();
+  const { placeOrder, payAndPlaceOrder } = useOrders();
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('COD');
+  // Card / UPI details: component state only. Never written to storage, wiped after payment and on unmount.
+  const [card, setCard] = useState<CardDetails>(EMPTY_CARD);
+  const [upiId, setUpiId] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors<PaymentField>>({});
   const [placing, setPlacing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [payStage, setPayStage] = useState<PaymentStage | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [payAmount, setPayAmount] = useState(0); // frozen at pay time: the bag empties just before the result arrives
+  const [notice, setNotice] = useState<CheckoutNotice | null>(null);
   const [placedOrderNumber, setPlacedOrderNumber] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Leaving checkout mid-payment cancels it (the gateway cancel path), so nothing is charged in the background.
+  useEffect(
+    () => () => {
+      abortRef.current?.abort();
+      abortRef.current = null;
+    },
+    [],
+  );
 
   // Derive instead of syncing state so the default address is picked without an effect.
   const selectedAddress = addresses.find((a) => a.id === selectedAddressId) ?? defaultAddress;
@@ -54,7 +75,8 @@ function CheckoutFlow({ step, onStepChange }: CheckoutFlowProps) {
     );
   }
 
-  if (cart.isEmpty) {
+  // The bag is emptied a tick before the order result arrives: don't flash the empty state mid-placement.
+  if (cart.isEmpty && !payStage && !placing) {
     return (
       <EmptyState
         title="Nothing to check out yet"
@@ -65,27 +87,129 @@ function CheckoutFlow({ step, onStepChange }: CheckoutFlowProps) {
   }
 
   const goTo = (next: CheckoutStep) => {
-    setError(null);
+    setNotice(null);
     onStepChange(next);
+  };
+
+  const paymentInput = (addressId: string): CheckoutPaymentInput =>
+    paymentMethod === 'CARD'
+      ? { addressId, paymentMethod: 'CARD', card }
+      : paymentMethod === 'UPI'
+        ? { addressId, paymentMethod: 'UPI', upiId }
+        : { addressId, paymentMethod: 'COD' };
+
+  const paymentInstrument =
+    paymentMethod === 'CARD'
+      ? `${detectCardBrand(card.number)} •••• ${cardDigits(card.number).slice(-4)}`
+      : paymentMethod === 'UPI'
+        ? `UPI ${maskUpiId(upiId)}`
+        : null;
+
+  const changeMethod = (method: PaymentMethod) => {
+    setPaymentMethod(method);
+    setFieldErrors({});
+  };
+
+  const continueFromPayment = () => {
+    const errors = validatePaymentInput(paymentInput(selectedAddress?.id ?? ''));
+    setFieldErrors(errors);
+    if (Object.keys(errors).length === 0) goTo(2);
+  };
+
+  const clearPaymentDetails = () => {
+    setCard(EMPTY_CARD);
+    setUpiId('');
+    setFieldErrors({});
+  };
+
+  const finish = (orderNumber: string) => {
+    clearPaymentDetails();
+    setPlacedOrderNumber(orderNumber);
+    router.push(`/checkout/success?order=${encodeURIComponent(orderNumber)}`);
   };
 
   const handlePlaceOrder = async () => {
     if (!selectedAddress) {
-      setError('Please select a shipping address');
+      setNotice({ tone: 'error', title: 'Shipping address needed', message: 'Please select a shipping address', retryable: false });
       onStepChange(0);
       return;
     }
-    setPlacing(true);
-    setError(null);
-    const result = await placeOrder({ addressId: selectedAddress.id, paymentMethod });
-    if (!result.ok) {
-      setError(result.error);
-      setPlacing(false);
+    setNotice(null);
+
+    if (paymentMethod === 'COD') {
+      setPlacing(true);
+      const result = await placeOrder({ addressId: selectedAddress.id, paymentMethod });
+      if (!result.ok) {
+        setNotice({ tone: 'error', title: 'We couldn’t place your order', message: result.error, retryable: false });
+        setPlacing(false);
+        return;
+      }
+      finish(result.data.orderNumber);
       return;
     }
-    setPlacedOrderNumber(result.data.orderNumber);
-    router.push(`/checkout/success?order=${encodeURIComponent(result.data.orderNumber)}`);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setCancelling(false);
+    setPayAmount(cart.totals.total);
+    setPayStage('initiating');
+    const result = await payAndPlaceOrder(paymentInput(selectedAddress.id), {
+      signal: controller.signal,
+      onStage: (stage) => setPayStage(stage),
+    });
+    if (abortRef.current !== controller) return; // unmounted or superseded
+    abortRef.current = null;
+    setPayStage(null);
+    setCancelling(false);
+
+    if (result.ok) {
+      finish(result.data.orderNumber);
+      return;
+    }
+    if (result.code === 'VALIDATION') {
+      setFieldErrors(result.fieldErrors ?? {});
+      onStepChange(1);
+      return;
+    }
+    if (result.code === 'PAYMENT_CANCELLED') {
+      setNotice({
+        tone: 'neutral',
+        title: 'Payment cancelled — you have not been charged',
+        message: 'Your bag is unchanged. You can try again or choose another payment method.',
+        retryable: true,
+      });
+      return;
+    }
+    if (result.code === 'PAYMENT_FAILED') {
+      setNotice({
+        tone: 'error',
+        title: 'Payment failed',
+        message: result.error, // already says the shopper was not charged and the bag is unchanged
+        retryable: true,
+      });
+      return;
+    }
+    setNotice({ tone: 'error', title: 'We couldn’t place your order', message: result.error, retryable: false });
   };
+
+  const cancelPayment = () => {
+    setCancelling(true);
+    abortRef.current?.abort();
+  };
+
+  if (payStage) {
+    return (
+      <div className="rounded-sm border border-line bg-white">
+        <PaymentProcessing
+          stage={payStage}
+          amount={payAmount}
+          instrument={paymentInstrument ?? ''}
+          cancelling={cancelling}
+          onCancel={cancelPayment}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_380px] lg:items-start">
@@ -100,13 +224,27 @@ function CheckoutFlow({ step, onStepChange }: CheckoutFlowProps) {
               onNext={() => goTo(1)}
             />
           )}
-          {step === 1 && <PaymentStep value={paymentMethod} onChange={setPaymentMethod} onBack={() => goTo(0)} onNext={() => goTo(2)} />}
+          {step === 1 && (
+            <PaymentStep
+              value={paymentMethod}
+              onChange={changeMethod}
+              card={card}
+              onCardChange={setCard}
+              upiId={upiId}
+              onUpiChange={setUpiId}
+              fieldErrors={fieldErrors}
+              onBack={() => goTo(0)}
+              onNext={continueFromPayment}
+            />
+          )}
           {step === 2 && selectedAddress && (
             <ReviewStep
               address={selectedAddress}
               paymentMethod={paymentMethod}
+              paymentInstrument={paymentInstrument}
               placing={placing}
-              error={error}
+              notice={notice}
+              onRetry={handlePlaceOrder}
               onEditStep={goTo}
               onBack={() => goTo(1)}
               onPlaceOrder={handlePlaceOrder}

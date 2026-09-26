@@ -3,6 +3,7 @@
 import { createContext, useContext, useMemo, useSyncExternalStore, type ReactNode } from 'react';
 import { getProductById, getVariant, getVariantLabel } from '@/lib/catalog';
 import type { ProductRecord } from '@/lib/mockTypes';
+import { getCatalog, getServerCatalog, lookupProduct, subscribeCatalog } from '@/lib/services/catalogStore';
 import type { AddToCartResult, WishlistItem } from '@/lib/services/types';
 import {
   addToWishlist,
@@ -55,11 +56,12 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
   const { ownerId, isHydrated } = useAuth();
   const store = useMemo(() => wishlistStore(ownerId), [ownerId]);
   const items = useSyncExternalStore(store.subscribe, store.get, store.getServerSnapshot);
+  const catalog = useSyncExternalStore(subscribeCatalog, getCatalog, getServerCatalog);
 
   const state = useMemo<WishlistState>(() => {
     const ids = new Set(items.map((item) => item.productId));
     const products = items
-      .map((item) => getProductById(item.productId))
+      .map((item) => lookupProduct(catalog, item.productId))
       .filter((product): product is ProductRecord => !!product);
     return {
       ownerId,
@@ -69,7 +71,7 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
       isHydrated,
       has: (productId) => ids.has(productId),
     };
-  }, [ownerId, items, isHydrated]);
+  }, [ownerId, items, isHydrated, catalog]);
 
   const actions = useMemo<WishlistActions>(
     () => ({

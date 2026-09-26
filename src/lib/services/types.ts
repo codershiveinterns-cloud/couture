@@ -4,11 +4,17 @@ export type ServiceResult<T = void> =
   | { ok: true; data: T }
   | { ok: false; error: string; fieldErrors?: FieldErrors };
 
+export type UserRole = 'customer' | 'admin';
+export type UserStatus = 'active' | 'blocked';
+
 export interface StoredUser {
   id: string;
   name: string;
   email: string;
   phone: string | null;
+  /** Users stored before Milestone 3 have no role/status; they are read as 'customer' / 'active'. */
+  role: UserRole;
+  status: UserStatus;
   salt: string;
   passwordHash: string;
   createdAt: string;
@@ -98,8 +104,22 @@ export type AddressSnapshot = Pick<
 >;
 
 export type PaymentMethod = 'COD' | 'CARD' | 'UPI';
-export type OrderStatus = 'PLACED' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
-export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
+export type OrderStatus =
+  | 'PLACED'
+  | 'CONFIRMED'
+  | 'PROCESSING'
+  | 'SHIPPED'
+  | 'OUT_FOR_DELIVERY'
+  | 'DELIVERED'
+  | 'CANCELLED'
+  | 'REFUNDED';
+export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'REFUNDED';
+
+export interface OrderStatusEvent {
+  status: OrderStatus;
+  at: string;
+  note?: string;
+}
 
 export interface OrderItem {
   productId: string;
@@ -136,7 +156,72 @@ export interface Order {
   totals: OrderTotals;
   couponCode: string | null;
   createdAt: string;
+  /** Milestone 3 fields. Orders stored by Milestone 2 are normalized on read (history = [{status, at: createdAt}]). */
+  updatedAt: string;
+  /** Oldest first; the last entry always matches `status`. */
+  statusHistory: OrderStatusEvent[];
+  trackingNumber: string | null;
+  trackingCarrier: string | null;
+  paymentId: string | null;
+  cancelReason: string | null;
 }
+
+export interface OrderCustomer {
+  id: string;
+  name: string;
+  email: string;
+}
+
+/** Order joined with its customer, as returned by the admin order APIs. */
+export interface AdminOrder extends Order {
+  customer: OrderCustomer;
+}
+
+export type PaymentRecordStatus = PaymentStatus;
+
+export interface PaymentRecord {
+  id: string;
+  /** Order number reserved for this attempt. FAILED/CANCELLED attempts never produce an order with this number. */
+  orderNumber: string;
+  userId: string;
+  method: PaymentMethod;
+  status: PaymentStatus;
+  amount: number;
+  currency: 'USD';
+  /** Gateway id ("cod" for cash on delivery). */
+  gateway: string;
+  /** Gateway reference / transaction id. */
+  reference: string;
+  /** Card brand + last 4 digits only. The full number, expiry and CVC are never stored. */
+  cardBrand?: string;
+  cardLast4?: string;
+  /** Masked, e.g. "su•••••@upi". */
+  upiId?: string;
+  createdAt: string;
+  updatedAt: string;
+  failureReason?: string;
+}
+
+export interface CustomerSummary {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  createdAt: string;
+  status: UserStatus;
+  orderCount: number;
+  /** Sum of order totals excluding CANCELLED / REFUNDED orders. */
+  totalSpent: number;
+  lastOrderAt: string | null;
+}
+
+export interface CustomerDetail extends CustomerSummary {
+  /** Newest first. */
+  orders: Order[];
+  addresses: Address[];
+}
+
+export type ReviewStatus = 'published' | 'hidden';
 
 export interface Review {
   id: string;
@@ -150,6 +235,13 @@ export interface Review {
   createdAt: string;
   isSeeded: boolean;
   verifiedPurchase: boolean;
+  /** Admin moderation. Storefront lists and summaries only include 'published'. */
+  status: ReviewStatus;
+}
+
+export interface AdminReview extends Review {
+  productName: string;
+  productSlug: string | null;
 }
 
 export interface ReviewView extends Review {

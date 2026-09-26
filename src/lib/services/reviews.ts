@@ -2,8 +2,18 @@ import { getProductById } from '../catalog';
 import { getJsonStore, isRecord, sanitizeArray, storageKeys } from '../storage';
 import { hasErrors, validateReviewInput, type ReviewInput } from '../validation';
 import { randomId } from './crypto';
+import { getBaseProductById, getCatalog, getProductById as getAnyProductById } from './catalogStore';
 import { hasPurchasedProduct } from './orders';
-import type { RatingBucket, Review, ReviewSummary, ReviewView, ServiceResult, User } from './types';
+import type {
+  AdminReview,
+  RatingBucket,
+  Review,
+  ReviewStatus,
+  ReviewSummary,
+  ReviewView,
+  ServiceResult,
+  User,
+} from './types';
 
 export const MAX_SEEDED_REVIEWS = 6;
 
@@ -28,11 +38,48 @@ function isReview(value: unknown): value is Review {
 
 export function reviewsStore() {
   return getJsonStore(storageKeys.reviews, EMPTY_REVIEWS, (v) =>
-    sanitizeArray(v, isReview).map((r) => ({ ...r, isSeeded: false, verifiedPurchase: !!r.verifiedPurchase })),
+    sanitizeArray(v, isReview).map((r) => ({
+      ...r,
+      isSeeded: false,
+      verifiedPurchase: !!r.verifiedPurchase,
+      // Reviews stored before Milestone 3 have no status: they are published.
+      status: r.status === 'hidden' ? ('hidden' as const) : ('published' as const),
+    })),
   );
 }
 
-/** Every user-submitted review across products (newest first). */
+export type SeededModeration = Record<string, 'hidden' | 'deleted'>;
+const EMPTY_MODERATION: SeededModeration = {};
+
+/** Seeded (generated) reviews are not stored, so their moderation state lives in its own key. */
+export function reviewModerationStore() {
+  return getJsonStore<SeededModeration>(storageKeys.reviewModeration, EMPTY_MODERATION, (v) => {
+    if (!isRecord(v)) return EMPTY_MODERATION;
+    const out: SeededModeration = {};
+    Object.entries(v).forEach(([id, state]) => {
+      if (state === 'hidden' || state === 'deleted') out[id] = state;
+    });
+    return out;
+  });
+}
+
+export const isReviewPublished = (review: Pick<Review, 'status'>) => review.status !== 'hidden';
+
+/** Storefront view of the seeded reviews: drops the ones an admin hid or deleted. */
+export function visibleSeededReviews(
+  seeded: readonly Review[],
+  moderation: SeededModeration = reviewModerationStore().get(),
+): readonly Review[] {
+  if (Object.keys(moderation).length === 0) return seeded;
+  return seeded.filter((r) => !moderation[r.id]);
+}
+
+/** How many of a product's seeded reviews were hidden/deleted (subtract from the product's reviewCount). */
+export function moderatedSeededCount(seeded: readonly Review[], moderation: SeededModeration): number {
+  return seeded.reduce((count, r) => count + (moderation[r.id] ? 1 : 0), 0);
+}
+
+/** Every user-submitted review across products (newest first), hidden ones included. */
 export function getAllUserReviews(): readonly Review[] {
   return reviewsStore().get();
 }
@@ -139,7 +186,8 @@ export function getSeededReviews(productId: string, avgRating: number, reviewCou
   if (cached) return cached;
 
   const rand = mulberry32(hashString(productId));
-  const productName = getProductById(productId)?.name ?? 'product';
+  // Base name first so the server render and the hydration render agree even after an admin rename.
+  const productName = getBaseProductById(productId)?.name ?? getProductById(productId)?.name ?? 'product';
   const ratings = distributeRatings(avgRating, count, rand);
   const usedNames = new Set<string>();
 
@@ -165,6 +213,7 @@ export function getSeededReviews(productId: string, avgRating: number, reviewCou
       createdAt: `2026-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:00.000Z`,
       isSeeded: true,
       verifiedPurchase: rand() < 0.75,
+      status: 'published',
     };
   });
 
@@ -271,6 +320,7 @@ export async function submitReview(
     createdAt: new Date().toISOString(),
     isSeeded: false,
     verifiedPurchase: hasPurchasedProduct(user.id, productId),
+    status: 'published',
   };
   reviewsStore().set([review, ...all]);
   return { ok: true, data: review };
@@ -281,6 +331,65 @@ export async function deleteReview(userId: string, reviewId: string): Promise<Se
   const review = all.find((r) => r.id === reviewId);
   if (!review) return { ok: false, error: 'Review not found' };
   if (review.userId !== userId) return { ok: false, error: 'You can only delete your own reviews' };
+  reviewsStore().set(all.filter((r) => r.id !== reviewId));
+  return { ok: true, data: undefined };
+}
+
+export interface ListAllReviewsOptions {
+  /** Include the generated demo reviews of every product (default true). */
+  includeSeeded?: boolean;
+}
+
+/**
+ * Admin moderation list: user reviews + seeded demo reviews (deleted seeded reviews are omitted),
+ * newest first, each with its product name/slug. Not referentially stable: wrap in useMemo
+ * (see hooks/useAllReviews).
+ */
+export function listAllReviews(options: ListAllReviewsOptions = {}): AdminReview[] {
+  const moderation = reviewModerationStore().get();
+  const describe = (review: Review): AdminReview => {
+    const product = getAnyProductById(review.productId) ?? getBaseProductById(review.productId);
+    return { ...review, productName: product?.name ?? 'Deleted product', productSlug: product?.slug ?? null };
+  };
+  const all: AdminReview[] = getAllUserReviews().map(describe);
+  if (options.includeSeeded !== false) {
+    getCatalog().products.forEach((product) => {
+      getSeededReviews(product.id, product.avgRating, product.reviewCount).forEach((review) => {
+        const state = moderation[review.id];
+        if (state === 'deleted') return;
+        all.push(describe(state === 'hidden' ? { ...review, status: 'hidden' } : review));
+      });
+    });
+  }
+  return all.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+}
+
+const isSeededId = (reviewId: string) => reviewId.startsWith('seed-');
+
+export function setReviewStatus(reviewId: string, status: ReviewStatus): ServiceResult {
+  if (status !== 'published' && status !== 'hidden') return { ok: false, error: 'Select a status' };
+  if (isSeededId(reviewId)) {
+    const moderation = reviewModerationStore().get();
+    if (moderation[reviewId] === 'deleted') return { ok: false, error: 'Review not found' };
+    const next = { ...moderation };
+    if (status === 'hidden') next[reviewId] = 'hidden';
+    else delete next[reviewId];
+    reviewModerationStore().set(next);
+    return { ok: true, data: undefined };
+  }
+  const all = getAllUserReviews();
+  if (!all.some((r) => r.id === reviewId)) return { ok: false, error: 'Review not found' };
+  reviewsStore().set(all.map((r) => (r.id === reviewId ? { ...r, status } : r)));
+  return { ok: true, data: undefined };
+}
+
+export function deleteReviewAsAdmin(reviewId: string): ServiceResult {
+  if (isSeededId(reviewId)) {
+    reviewModerationStore().set({ ...reviewModerationStore().get(), [reviewId]: 'deleted' });
+    return { ok: true, data: undefined };
+  }
+  const all = getAllUserReviews();
+  if (!all.some((r) => r.id === reviewId)) return { ok: false, error: 'Review not found' };
   reviewsStore().set(all.filter((r) => r.id !== reviewId));
   return { ok: true, data: undefined };
 }

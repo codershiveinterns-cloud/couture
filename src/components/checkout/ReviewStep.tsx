@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/Button';
 import { useCart } from '@/context/CartContext';
+import { formatPrice } from '@/lib/format';
 import { formatAddressLines } from '@/lib/services/addresses';
 import { PAYMENT_METHOD_LABELS } from '@/lib/services/orders';
 import type { Address, PaymentMethod } from '@/lib/services/types';
@@ -10,11 +11,23 @@ import { OrderItemsList } from './OrderItemsList';
 export interface ReviewStepProps {
   address: Address;
   paymentMethod: PaymentMethod;
+  /** "Visa •••• 4242" / masked UPI id for online methods; null for COD. */
+  paymentInstrument: string | null;
   placing: boolean;
-  error: string | null;
+  notice: CheckoutNotice | null;
+  onRetry(): void;
   onEditStep(step: 0 | 1): void;
   onBack(): void;
   onPlaceOrder(): void;
+}
+
+export interface CheckoutNotice {
+  /** error = payment failed / order invalid; neutral = the shopper cancelled the payment. */
+  tone: 'error' | 'neutral';
+  title: string;
+  message: string;
+  /** Offer "Try again" / "Use a different method" (payment problems only). */
+  retryable: boolean;
 }
 
 const PANEL = 'rounded-sm border border-line bg-white p-4 sm:p-5';
@@ -32,9 +45,20 @@ function EditButton({ onClick, label }: { onClick(): void; label: string }) {
   );
 }
 
-export function ReviewStep({ address, paymentMethod, placing, error, onEditStep, onBack, onPlaceOrder }: ReviewStepProps) {
+export function ReviewStep({
+  address,
+  paymentMethod,
+  paymentInstrument,
+  placing,
+  notice,
+  onRetry,
+  onEditStep,
+  onBack,
+  onPlaceOrder,
+}: ReviewStepProps) {
   const { lines, totals, appliedCoupon, hasStockIssues } = useCart();
   const addressLines = formatAddressLines(address);
+  const isOnline = paymentMethod !== 'COD';
 
   return (
     <div className="flex flex-col gap-5">
@@ -82,7 +106,14 @@ export function ReviewStep({ address, paymentMethod, placing, error, onEditStep,
             <EditButton onClick={() => onEditStep(1)} label="Change" />
           </div>
           <p className="text-[14px] font-bold text-ink">{PAYMENT_METHOD_LABELS[paymentMethod]}</p>
-          <p className="text-[13px] text-ink-2">Payment is collected when your order arrives.</p>
+          {isOnline ? (
+            <>
+              {paymentInstrument && <p className="text-[13px] font-medium text-ink-2">{paymentInstrument}</p>}
+              <p className="text-[13px] text-ink-2">You will be charged {formatPrice(totals.total)} when you place the order.</p>
+            </>
+          ) : (
+            <p className="text-[13px] text-ink-2">Payment is collected when your order arrives.</p>
+          )}
           {appliedCoupon && (
             <p className="mt-3 text-[12px] text-success">
               Coupon <span className="font-bold">{appliedCoupon.code}</span> applied — {appliedCoupon.description}
@@ -91,9 +122,31 @@ export function ReviewStep({ address, paymentMethod, placing, error, onEditStep,
         </section>
       </div>
 
-      {(error || hasStockIssues) && (
+      {notice && (
+        <div
+          role="alert"
+          className={`rounded-sm border px-4 py-3.5 ${
+            notice.tone === 'error' ? 'border-brand/40 bg-brand-light' : 'border-line-strong bg-surface'
+          }`}
+        >
+          <p className={`text-[14px] font-bold ${notice.tone === 'error' ? 'text-brand-dark' : 'text-ink'}`}>{notice.title}</p>
+          <p className="mt-0.5 text-[13px] text-ink-2">{notice.message}</p>
+          {notice.retryable && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button size="sm" onClick={onRetry} disabled={hasStockIssues}>
+                Try again
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => onEditStep(1)}>
+                Use a different method
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {hasStockIssues && (
         <p role="alert" className="rounded-sm bg-brand-light px-4 py-3 text-[13px] font-medium text-brand">
-          {error ?? 'Some items are out of stock or exceed the available quantity. Please update your bag.'}
+          Some items are out of stock or exceed the available quantity. Please update your bag.
         </p>
       )}
 
@@ -102,7 +155,7 @@ export function ReviewStep({ address, paymentMethod, placing, error, onEditStep,
           Back
         </Button>
         <Button size="lg" onClick={onPlaceOrder} loading={placing} loadingText="Placing order…" disabled={hasStockIssues} className="sm:min-w-[220px]">
-          Place order
+          {isOnline ? `Pay ${formatPrice(totals.total)} & place order` : 'Place order'}
         </Button>
       </div>
     </div>

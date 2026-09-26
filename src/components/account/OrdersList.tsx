@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useOrders } from '@/hooks/useOrders';
 import { formatPrice } from '@/lib/format';
+import { PAYMENT_METHOD_LABELS } from '@/lib/services/orders';
 import type { Order } from '@/lib/services/types';
-import { formatDate, LoadingPanel, OrderStatusBadge } from './accountUtils';
+import { formatDate, LoadingPanel, OrderStatusBadge, PaymentStatusBadge } from './accountUtils';
 
 const MAX_THUMBNAILS = 4;
 
@@ -64,6 +65,7 @@ function OrderRow({ order }: { order: Order }) {
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line px-5 py-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <OrderStatusBadge status={order.status} />
+          <PaymentStatusBadge status={order.paymentStatus} method={order.paymentMethod} />
           <p className="text-[14px] font-bold text-ink transition-colors group-hover:text-brand">{order.orderNumber}</p>
         </div>
         <p className="text-[12px] text-ink-3">
@@ -94,10 +96,18 @@ function OrderRow({ order }: { order: Order }) {
           )}
         </div>
         <div className="text-right">
-          <p className="text-[12px] font-bold uppercase tracking-wide text-ink-3">Total</p>
+          <p className="text-[12px] font-bold uppercase tracking-wide text-ink-3">
+            Total · {PAYMENT_METHOD_LABELS[order.paymentMethod] ?? order.paymentMethod}
+          </p>
           <p className="text-[16px] font-bold text-ink">{formatPrice(order.totals.total)}</p>
         </div>
       </div>
+
+      {order.trackingNumber && order.status !== 'DELIVERED' && order.status !== 'CANCELLED' && order.status !== 'REFUNDED' && (
+        <p className="border-t border-line px-5 py-2.5 text-[12px] text-ink-3">
+          Tracking: <span className="font-bold text-ink-2">{order.trackingCarrier ?? 'Carrier'}</span> · {order.trackingNumber}
+        </p>
+      )}
 
       <p className="flex items-center gap-1 border-t border-line px-5 py-3 text-[13px] font-bold uppercase tracking-wide text-brand">
         View details

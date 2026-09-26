@@ -1,6 +1,18 @@
-import { MOCK_CATEGORIES, MOCK_PRODUCTS } from './mockData';
+// Client-side catalog lookups used by the cart, wishlist, orders and search suggestions.
+// They resolve against the EFFECTIVE catalog (base data + admin overrides, see services/catalogStore),
+// so admin price/stock edits flow into the bag, and draft/deleted products are treated as unavailable.
+// On the server the effective catalog is the base catalog.
+
 import type { CategoryRecord, ProductRecord, ProductVariantRecord } from './mockTypes';
 import { roundMoney } from './pricing';
+import {
+  getCatalog,
+  getCategoryBySlug as getEffectiveCategoryBySlug,
+  getProductBySlug as getEffectiveProductBySlug,
+  getPublishedProducts,
+  isProductPublished,
+  lookupProduct,
+} from './services/catalogStore';
 
 export type CatalogProduct = ProductRecord;
 export type CatalogVariant = ProductVariantRecord;
@@ -24,28 +36,27 @@ export interface ProductLike<V extends VariantLike = VariantLike> {
   variants: readonly V[];
 }
 
-const productsById = new Map(MOCK_PRODUCTS.map((p) => [p.id, p]));
-const productsBySlug = new Map(MOCK_PRODUCTS.map((p) => [p.slug, p]));
-const categoriesBySlug = new Map(MOCK_CATEGORIES.map((c) => [c.slug, c]));
-
+/** Published products of the effective catalog, newest first. */
 export function getAllProducts(): readonly ProductRecord[] {
-  return MOCK_PRODUCTS;
+  return getPublishedProducts();
 }
 
 export function getAllCategories(): readonly CategoryRecord[] {
-  return MOCK_CATEGORIES;
+  return getCatalog().categories;
 }
 
+/** undefined for unknown, deleted and unpublished (draft) products. */
 export function getProductById(id: string | null | undefined): ProductRecord | undefined {
-  return id ? productsById.get(id) : undefined;
+  return lookupProduct(getCatalog(), id);
 }
 
 export function getProductBySlugSync(slug: string | null | undefined): ProductRecord | undefined {
-  return slug ? productsBySlug.get(slug) : undefined;
+  const product = getEffectiveProductBySlug(slug);
+  return product && isProductPublished(product) ? product : undefined;
 }
 
 export function getCategoryBySlugSync(slug: string | null | undefined): CategoryRecord | undefined {
-  return slug ? categoriesBySlug.get(slug) : undefined;
+  return getEffectiveCategoryBySlug(slug);
 }
 
 export function hasVariants(product: ProductLike): boolean {
