@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { TotalsTable } from '@/components/cart/TotalsTable';
@@ -121,6 +122,16 @@ function SuccessContent() {
               Continue shopping
             </Button>
           </div>
+          <p className="mt-4 text-[13px] text-ink-3">
+            Not signed in on another device?{' '}
+            <Link
+              href={`/track?order=${encodeURIComponent(order.orderNumber)}`}
+              className="font-bold text-brand hover:underline"
+            >
+              Track this order
+            </Link>{' '}
+            with your order number and email.
+          </p>
         </section>
 
         <section aria-labelledby="success-items" className={PANEL}>

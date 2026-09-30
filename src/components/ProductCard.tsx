@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import type { ProductSummary } from '@/lib/types';
 import { formatPrice } from '@/lib/format';
+import { LOW_STOCK_THRESHOLD } from '@/lib/services/catalogStore';
 import { useCartActions } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import StarRating from './StarRating';
@@ -50,6 +51,7 @@ export default function ProductCard({ product }: { product: ProductSummary }) {
   const hasDiscount = product.compareAtPrice !== null && product.compareAtPrice > product.price;
   const discountPct = hasDiscount ? Math.round((1 - product.price / (product.compareAtPrice as number)) * 100) : 0;
   const outOfStock = product.stock <= 0;
+  const lowStock = !outOfStock && product.stock <= LOW_STOCK_THRESHOLD;
   const brand = product.brand || product.category?.name || 'Couture';
   const href = `/products/${product.slug}`;
   const badge = product.reviewCount >= 100 ? 'BESTSELLER' : product.isFeatured ? 'NEW' : null;
@@ -79,10 +81,19 @@ export default function ProductCard({ product }: { product: ProductSummary }) {
             <div className="flex h-full w-full items-center justify-center text-[12px] text-ink-4">No image</div>
           )}
 
-          {badge && (
-            <span className="absolute left-2 top-2 rounded-full bg-white px-2 py-1 text-[10px] font-bold leading-none tracking-wide text-ink shadow-[0_1px_3px_rgba(40,44,63,0.15)]">
-              {badge}
-            </span>
+          {(badge || lowStock) && (
+            <div className="pointer-events-none absolute left-2 top-2 flex flex-col items-start gap-1">
+              {badge && (
+                <span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold leading-none tracking-wide text-ink shadow-[0_1px_3px_rgba(40,44,63,0.15)]">
+                  {badge}
+                </span>
+              )}
+              {lowStock && (
+                <span className="rounded-sm bg-white px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-discount shadow-[0_1px_3px_rgba(40,44,63,0.15)]">
+                  Only {product.stock} left
+                </span>
+              )}
+            </div>
           )}
 
           {product.reviewCount > 0 && (
@@ -111,7 +122,7 @@ export default function ProductCard({ product }: { product: ProductSummary }) {
             aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
             aria-pressed={wishlisted}
             onClick={onWishlist}
-            className={`absolute right-2 top-2 hidden h-8 w-8 items-center justify-center rounded-full bg-white/95 shadow-[0_1px_3px_rgba(40,44,63,0.2)] pointer-coarse:flex ${
+            className={`absolute right-1.5 top-1.5 hidden h-10 w-10 items-center justify-center rounded-full bg-white/95 shadow-[0_1px_3px_rgba(40,44,63,0.2)] pointer-coarse:flex ${
               wishlisted ? 'text-brand' : 'text-ink-2'
             }`}
           >
@@ -144,7 +155,7 @@ export default function ProductCard({ product }: { product: ProductSummary }) {
               e.stopPropagation();
               quickAdd();
             }}
-            className={`flex h-9 w-full items-center justify-center gap-1.5 rounded-sm text-[12px] font-bold uppercase tracking-wide text-white transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${
+            className={`flex h-10 w-full items-center justify-center gap-1.5 rounded-sm text-[12px] font-bold uppercase tracking-wide text-white transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${
               justAdded ? 'bg-success' : 'bg-brand hover:bg-brand-dark'
             }`}
           >
@@ -171,7 +182,7 @@ export default function ProductCard({ product }: { product: ProductSummary }) {
           aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
           aria-pressed={wishlisted}
           onClick={onWishlist}
-          className={`flex h-9 w-full items-center justify-center gap-1.5 rounded-sm border text-[12px] font-bold uppercase tracking-wide transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${
+          className={`flex h-10 w-full items-center justify-center gap-1.5 rounded-sm border text-[12px] font-bold uppercase tracking-wide transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${
             wishlisted
               ? 'border-brand bg-brand text-white hover:bg-brand-dark'
               : 'border-line-strong bg-white text-ink hover:border-ink'

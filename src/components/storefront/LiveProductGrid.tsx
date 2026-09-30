@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { Suspense, useMemo, type ReactNode } from 'react';
 import { listCategories, parseProductQuery, queryProducts, toCategorySummary } from '@/lib/api';
-import { LOW_STOCK_THRESHOLD } from '@/lib/services/catalogStore';
 import type { CategorySummary, ProductSearchResult } from '@/lib/types';
 import FadeImage from '@/components/FadeImage';
 import ProductCard from '@/components/ProductCard';
@@ -276,12 +275,6 @@ export default function LiveProductGrid({
             <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 xl:grid-cols-4">
               {result.data.map((product) => (
                 <div key={product.id} className="relative z-0 hover:z-10 focus-within:z-10">
-                  {product.stock > 0 && product.stock <= LOW_STOCK_THRESHOLD && (
-                    // Sits under ProductCard's own NEW/BESTSELLER pill (top-2) so the two stack.
-                    <span className="pointer-events-none absolute left-2 top-9 z-20 rounded-sm bg-white px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-discount shadow-[0_1px_3px_rgba(40,44,63,0.15)]">
-                      Only {product.stock} left
-                    </span>
-                  )}
                   <ProductCard product={product} />
                 </div>
               ))}

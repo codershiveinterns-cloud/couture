@@ -43,6 +43,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { href: '/admin/orders', label: 'Orders', icon: <Icon><path d="M6 2h12l2 4v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6l2-4z" /><path d="M4 6h16M9 10a3 3 0 006 0" /></Icon> },
       { href: '/admin/payments', label: 'Payments', icon: <Icon><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20M6 15h4" /></Icon> },
       { href: '/admin/coupons', label: 'Coupons', icon: <Icon><path d="M3 9V6a1 1 0 011-1h16a1 1 0 011 1v3a3 3 0 000 6v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3a3 3 0 000-6z" /><path d="M14 9l-4 6M10 9.5h.01M14 14.5h.01" /></Icon> },
+      { href: '/admin/notifications', label: 'Notifications', icon: <Icon><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></Icon> },
     ],
   },
   {

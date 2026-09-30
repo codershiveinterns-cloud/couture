@@ -1,4 +1,6 @@
+import type { Metadata } from 'next';
 import { getCategories, getProducts, type ProductQuery } from '@/lib/api';
+import { organizationJsonLd, pageMetadata, serializeJsonLd, SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, webSiteJsonLd } from '@/lib/seo';
 import Reveal from '@/components/Reveal';
 import CouponBanner from '@/components/home/CouponBanner';
 import HeroCarousel, { type HeroSlide } from '@/components/home/HeroCarousel';
@@ -13,6 +15,15 @@ import {
 import TrustRow from '@/components/home/TrustRow';
 import Testimonials from '@/components/home/Testimonials';
 import NewsletterBand from '@/components/home/NewsletterBand';
+
+export const metadata: Metadata = pageMetadata({
+  title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+  absoluteTitle: true,
+  description: SITE_DESCRIPTION,
+  path: '/',
+});
+
+const HOME_JSON_LD = serializeJsonLd([organizationJsonLd(), webSiteJsonLd()]);
 
 const HERO_SLIDES: HeroSlide[] = [
   {
@@ -63,6 +74,8 @@ export default async function HomePage() {
 
   return (
     <div className="bg-canvas">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: HOME_JSON_LD }} />
+      <h1 className="sr-only">Couture — online shopping for electronics, fashion, home, beauty and sports</h1>
       <CouponBanner />
 
       <div className="pt-3">

@@ -15,6 +15,8 @@ export const storageKeys = {
   catalogDeletedCategories: `${STORAGE_PREFIX}catalog:deletedCategories`,
   coupons: `${STORAGE_PREFIX}coupons`,
   payments: `${STORAGE_PREFIX}payments`,
+  /** Transactional notifications: in-app records + the email outbox (see services/notifications). */
+  notifications: `${STORAGE_PREFIX}notifications`,
   /** Prefix shared by every per-user orders key (see subscribePrefix). */
   ordersPrefix: `${STORAGE_PREFIX}orders:`,
   cart: (owner: string) => `${STORAGE_PREFIX}cart:${owner}`,

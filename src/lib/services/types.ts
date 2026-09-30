@@ -261,3 +261,37 @@ export interface ReviewSummary {
   /** Ordered 5 -> 1. */
   distribution: RatingBucket[];
 }
+
+export type NotificationType =
+  | 'REGISTRATION'
+  | 'ORDER_CONFIRMATION'
+  | 'PAYMENT_RECEIVED'
+  | 'PAYMENT_FAILED'
+  | 'ORDER_STATUS'
+  | 'ORDER_SHIPPED'
+  | 'ORDER_DELIVERED'
+  | 'ORDER_CANCELLED'
+  | 'ORDER_REFUNDED';
+
+/** 'in_app' = shown under the header bell; 'email' = a rendered message waiting in the outbox. */
+export type NotificationChannel = 'in_app' | 'email';
+
+export interface NotificationRecord {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  /** Plain text. For 'email' records this is the full message body. */
+  body: string;
+  /** Deep link, e.g. /account/orders/CTR-XXXXXXXX. */
+  href: string;
+  orderNumber: string | null;
+  channel: NotificationChannel;
+  emailTo: string;
+  subject: string;
+  /** Always true for 'email' records (only in-app notifications are read/unread). */
+  read: boolean;
+  createdAt: string;
+  /** Set once the email transport accepted the message; null while it waits in the outbox. */
+  deliveredAt: string | null;
+}

@@ -1,14 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ADMIN_TABLE, AdminCard, AdminPage, StatusPill } from '@/components/admin/AdminPage';
 import { BarList, Donut, SalesChart } from '@/components/admin/charts';
 import { KpiTile, KpiTileSkeleton, halfOverHalfTrend } from '@/components/admin/dashboard/KpiTile';
 import { ProductThumb } from '@/components/admin/dashboard/ProductThumb';
 import { ORDER_STATUS_TONES } from '@/components/admin/dashboard/statusTones';
-import { useDashboard } from '@/hooks/useAnalytics';
+import { useAnalyticsSource } from '@/hooks/useAnalytics';
 import { formatPrice } from '@/lib/format';
+import {
+  bestSellers as computeBestSellers,
+  getDashboardStats,
+  orderStatusSplit,
+  paymentMethodSplit,
+  salesByCategory,
+  salesByDay,
+} from '@/lib/services/analytics';
 import { ORDER_STATUS_LABELS, PAYMENT_METHOD_LABELS } from '@/lib/services/orders';
 
 const PERIODS = [7, 14, 30] as const;
@@ -20,7 +28,24 @@ function SkeletonBlock({ height }: { height: number }) {
 
 export function AnalyticsView() {
   const [period, setPeriod] = useState<Period>(14);
-  const { stats, daily, bestSellers, byCategory, byPaymentMethod, byStatus, isHydrated } = useDashboard({ days: period, bestSellerLimit: 10 });
+  const { source, isHydrated } = useAnalyticsSource();
+
+  // Every panel follows the selected period: orders are restricted to the same local-day window
+  // salesByDay uses (today and the previous period-1 days) before the analytics functions run.
+  const { stats, daily, bestSellers, byCategory, byPaymentMethod, byStatus } = useMemo(() => {
+    const today = new Date();
+    const windowStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (period - 1)).getTime();
+    const periodSource = { ...source, orders: source.orders.filter((order) => new Date(order.createdAt).getTime() >= windowStart) };
+    return {
+      stats: getDashboardStats(source),
+      daily: salesByDay(period, source),
+      bestSellers: computeBestSellers(10, periodSource),
+      byCategory: salesByCategory(periodSource),
+      byPaymentMethod: paymentMethodSplit(periodSource),
+      byStatus: orderStatusSplit(periodSource),
+    };
+  }, [source, period]);
+  const periodLabel = `Last ${period} days`;
 
   const periodRevenue = daily.reduce((sum, day) => sum + day.revenue, 0);
   const periodOrders = daily.reduce((sum, day) => sum + day.orders, 0);
@@ -69,13 +94,13 @@ export function AnalyticsView() {
       </AdminCard>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <AdminCard title="Best-selling products" padded={false} className="min-w-0 xl:col-span-2" aside={<span className="text-[12px] text-ink-3">All time</span>}>
+        <AdminCard title="Best-selling products" padded={false} className="min-w-0 xl:col-span-2" aside={<span className="text-[12px] text-ink-3">{periodLabel}</span>}>
           {!isHydrated ? (
             <div className="p-5">
               <SkeletonBlock height={260} />
             </div>
           ) : bestSellers.length === 0 ? (
-            <p className="px-5 py-10 text-center text-[13px] text-ink-3">No sales yet.</p>
+            <p className="px-5 py-10 text-center text-[13px] text-ink-3">No sales in the last {period} days.</p>
           ) : (
             <div className={ADMIN_TABLE.wrap}>
               <table className={`${ADMIN_TABLE.table} min-w-[520px]`}>
@@ -112,14 +137,14 @@ export function AnalyticsView() {
           )}
         </AdminCard>
 
-        <AdminCard title="Payment methods" className="min-w-0" aside={<span className="text-[12px] text-ink-3">By revenue</span>}>
+        <AdminCard title="Payment methods" className="min-w-0" aside={<span className="text-[12px] text-ink-3">By revenue · {periodLabel.toLowerCase()}</span>}>
           {isHydrated ? (
             <>
               <Donut
                 ariaLabel="Share of revenue by payment method"
                 centerLabel="Revenue"
-                centerValue={formatPrice(stats.totalSales)}
-                emptyText="No paid orders yet"
+                centerValue={formatPrice(periodRevenue)}
+                emptyText={`No orders in the last ${period} days`}
                 slices={byPaymentMethod.map((share) => ({
                   key: share.method,
                   label: PAYMENT_METHOD_LABELS[share.method],
@@ -138,11 +163,11 @@ export function AnalyticsView() {
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <AdminCard title="Sales by category" className="min-w-0" aside={<span className="text-[12px] text-ink-3">Revenue · all time</span>}>
+        <AdminCard title="Sales by category" className="min-w-0" aside={<span className="text-[12px] text-ink-3">Revenue · {periodLabel.toLowerCase()}</span>}>
           {isHydrated ? (
             <BarList
               ariaLabel="Revenue by category"
-              emptyText="No sales yet"
+              emptyText={`No sales in the last ${period} days`}
               items={byCategory.map((category) => ({
                 key: category.categoryId ?? `uncategorised-${category.name}`,
                 label: category.name,
@@ -156,11 +181,11 @@ export function AnalyticsView() {
           )}
         </AdminCard>
 
-        <AdminCard title="Order status" className="min-w-0" aside={<span className="text-[12px] text-ink-3">{isHydrated ? `${statusTotal} orders` : ''}</span>}>
+        <AdminCard title="Order status" className="min-w-0" aside={<span className="text-[12px] text-ink-3">{isHydrated ? `${statusTotal} orders · ${periodLabel.toLowerCase()}` : ''}</span>}>
           {!isHydrated ? (
             <SkeletonBlock height={220} />
           ) : statusTotal === 0 ? (
-            <p className="py-6 text-center text-[13px] text-ink-3">No orders yet</p>
+            <p className="py-6 text-center text-[13px] text-ink-3">No orders in the last {period} days</p>
           ) : (
             <ul className="flex flex-col gap-3" aria-label="Orders by status">
               {byStatus.map((row) => (

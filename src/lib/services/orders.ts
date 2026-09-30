@@ -15,6 +15,7 @@ import { buildCartLines, clearCart, getCartCouponCode, getCartItems, setCartCoup
 import { adjustStock } from './catalogStore';
 import { recordCouponUse, validateCoupon } from './coupons';
 import { randomBase36, randomId } from './crypto';
+import { notify, type Recipient } from './notifications';
 import { COD_GATEWAY_ID, createPaymentForOrder, getPaymentById, getPaymentByOrder, setPaymentStatus } from './payments';
 import type {
   Address,
@@ -275,6 +276,14 @@ export function generateOrderNumber(existing: readonly Pick<Order, 'orderNumber'
   return candidate;
 }
 
+/** Who to notify about an order (null when the account no longer exists). */
+function recipientOf(userId: string): Recipient | null {
+  const user = usersStore()
+    .get()
+    .find((u) => u.id === userId);
+  return user ? { id: user.id, name: user.name, email: user.email } : null;
+}
+
 function saveOrder(order: Order): void {
   ordersStore(order.userId).update((orders) => orders.map((o) => (o.id === order.id ? order : o)));
 }
@@ -420,6 +429,11 @@ function commitOrder({ userId, orderNumber, draft, paymentMethod, paymentStatus,
   recordCouponUse(order.couponCode);
   ordersStore(userId).set([order, ...getOrders(userId)]);
   clearCart(userId);
+  const user = recipientOf(userId);
+  if (user) {
+    notify({ type: 'ORDER_CONFIRMATION', user, order });
+    if (paid) notify({ type: 'PAYMENT_RECEIVED', user, order });
+  }
   return order;
 }
 
@@ -519,6 +533,10 @@ export async function payAndPlaceOrder(
 
   const recordAttempt = (status: PaymentStatus, details: { reference?: string; cardBrand?: string; cardLast4?: string; upiId?: string; failureReason?: string }) =>
     createPaymentForOrder({ orderNumber, userId, method: input.paymentMethod, amount, status, gateway: gateway.id, ...details });
+  const notifyFailure = (reason: string) => {
+    const user = recipientOf(userId);
+    if (user) notify({ type: 'PAYMENT_FAILED', user, orderNumber, amount, method: input.paymentMethod, reason });
+  };
 
   try {
     onStage?.('initiating', null);
@@ -551,6 +569,7 @@ export async function payAndPlaceOrder(
     if (outcome.status === 'FAILED') {
       const reason = outcome.failureReason ?? 'Your payment could not be completed';
       recordAttempt('FAILED', { ...details, failureReason: reason });
+      notifyFailure(reason);
       return { ok: false, error: `${reason}. You have not been charged and your bag is unchanged.`, code: 'PAYMENT_FAILED' };
     }
 
@@ -575,6 +594,7 @@ export async function payAndPlaceOrder(
     return { ok: true, data: order };
   } catch {
     recordAttempt('FAILED', { failureReason: 'Payment gateway unavailable' });
+    notifyFailure('Payment gateway unavailable');
     return { ok: false, error: 'We could not reach the payment gateway. Please try again.', code: 'PAYMENT_FAILED' };
   }
 }
@@ -628,6 +648,7 @@ export function cancelOrder(orderNumber: string, reason?: string, options: Cance
   if (order.paymentStatus === 'PENDING') order = syncPayment(order, 'CANCELLED');
   saveOrder(order);
   adjustStock(order.items, 'increment');
+  notify({ type: 'ORDER_CANCELLED', user: found.customer, order });
   return { ok: true, data: order };
 }
 
@@ -647,6 +668,7 @@ export function refundOrder(orderNumber: string, note?: string): ServiceResult<O
   }
   const order = syncPayment(withStatus(stripCustomer(found), 'REFUNDED', note ?? 'Payment refunded'), 'REFUNDED');
   saveOrder(order);
+  notify({ type: 'ORDER_REFUNDED', user: found.customer, order });
   return { ok: true, data: order };
 }
 
@@ -668,10 +690,15 @@ export function updateOrderStatus(orderNumber: string, status: OrderStatus, note
     };
   }
   let order = withStatus(stripCustomer(found), status, note);
-  if (status === 'DELIVERED' && order.paymentMethod === 'COD' && order.paymentStatus === 'PENDING') {
-    order = syncPayment(order, 'PAID');
-  }
+  const cashCollected = status === 'DELIVERED' && order.paymentMethod === 'COD' && order.paymentStatus === 'PENDING';
+  if (cashCollected) order = syncPayment(order, 'PAID');
   saveOrder(order);
+  notify({
+    type: status === 'SHIPPED' ? 'ORDER_SHIPPED' : status === 'DELIVERED' ? 'ORDER_DELIVERED' : 'ORDER_STATUS',
+    user: found.customer,
+    order,
+  });
+  if (cashCollected) notify({ type: 'PAYMENT_RECEIVED', user: found.customer, order });
   return { ok: true, data: order };
 }
 
@@ -700,6 +727,10 @@ export function setTracking(orderNumber: string, carrier: string, trackingNumber
     updatedAt: new Date().toISOString(),
   };
   saveOrder(order);
+  // Tracking added after the parcel left: re-send the "on its way" message with the carrier details.
+  if (order.status === 'SHIPPED' || order.status === 'OUT_FOR_DELIVERY') {
+    notify({ type: 'ORDER_SHIPPED', user: found.customer, order });
+  }
   return { ok: true, data: order };
 }
 
@@ -716,6 +747,7 @@ export function markCodCollected(orderNumber: string): ServiceResult<Order> {
   }
   const order = syncPayment({ ...stripCustomer(found), updatedAt: new Date().toISOString() }, 'PAID');
   saveOrder(order);
+  notify({ type: 'PAYMENT_RECEIVED', user: found.customer, order });
   return { ok: true, data: order };
 }
 

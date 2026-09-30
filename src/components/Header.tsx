@@ -23,6 +23,7 @@ import {
 import { BagIcon, HeartIcon, MenuIcon, UserIcon } from '@/components/header/icons';
 import { useScrolledPast } from '@/components/header/useScrolledPast';
 import Logo from '@/components/Logo';
+import NotificationBell from '@/components/notifications/NotificationBell';
 
 const SHOP_ALL_KEY = '__all__';
 const PROTECTED_PREFIXES = ['/account', '/checkout'];
@@ -30,6 +31,7 @@ const PROTECTED_PREFIXES = ['/account', '/checkout'];
 const ACCOUNT_LINKS = [
   { href: '/account', label: 'Profile' },
   { href: '/account/orders', label: 'Orders' },
+  { href: '/account/notifications', label: 'Notifications' },
   { href: '/account/addresses', label: 'Addresses' },
   { href: '/wishlist', label: 'Wishlist' },
 ];
@@ -346,6 +348,8 @@ export default function Header({ categories }: { categories: CategorySummary[] }
               </div>
             </div>
           </div>
+
+          <NotificationBell />
 
           <IconStack
             href="/wishlist"

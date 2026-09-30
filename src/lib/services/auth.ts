@@ -15,6 +15,7 @@ import {
   type ResetPasswordInput,
 } from '../validation';
 import { hashPassword, randomHex, randomId, safeEqual, sha256HexSync } from './crypto';
+import { notify } from './notifications';
 import type {
   ForgotPasswordResult,
   ResetTokenRecord,
@@ -303,6 +304,7 @@ export async function createAccount(input: RegisterInput): Promise<ServiceResult
     return { ok: false, error: EMAIL_TAKEN_ERROR, fieldErrors: { email: EMAIL_TAKEN_ERROR } };
   }
   usersStore().update((users) => [...users, user]);
+  notify({ type: 'REGISTRATION', user: { id: user.id, name: user.name, email: user.email } });
   return { ok: true, data: toPublicUser(user) };
 }
 

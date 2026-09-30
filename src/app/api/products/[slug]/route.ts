@@ -1,21 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getProductBySlug } from '@/lib/api';
+import { isValidSlug, jsonError, jsonOk, rateLimitRequest } from '@/lib/rateLimit';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ slug: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+  const { blocked, headers } = rateLimitRequest(request);
+  if (blocked) return blocked;
+
   try {
     const { slug } = await params;
+    if (!isValidSlug(slug)) return jsonError('Product not found', 404, headers);
+
     const product = await getProductBySlug(slug);
-    if (!product) {
-      return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 });
-    }
-    return NextResponse.json({ success: true, data: product });
+    if (!product) return jsonError('Product not found', 404, headers);
+    return jsonOk({ success: true, data: product }, headers);
   } catch {
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch product' },
-      { status: 500 }
-    );
+    return jsonError('Failed to fetch product', 500, headers);
   }
 }

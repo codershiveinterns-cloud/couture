@@ -202,10 +202,15 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
                   aria-selected={i === index}
                   aria-label={`Go to slide ${i + 1}`}
                   onClick={() => goTo(i)}
-                  className={`h-2 rounded-full transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white ${
-                    i === index ? 'w-6 bg-white' : 'w-2 bg-white/55 hover:bg-white/80'
-                  }`}
-                />
+                  className="group flex h-6 min-w-6 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`block h-2 rounded-full transition-all duration-200 ${
+                      i === index ? 'w-6 bg-white' : 'w-2 bg-white/55 group-hover:bg-white/80'
+                    }`}
+                  />
+                </button>
               ))}
             </div>
 

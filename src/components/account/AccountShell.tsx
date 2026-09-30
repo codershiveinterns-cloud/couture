@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { useAuth } from '@/context/AuthContext';
+import { useNotifications } from '@/hooks/useNotifications';
 
 interface NavItem {
   href: string;
@@ -15,6 +16,7 @@ interface NavItem {
 const NAV_ITEMS: readonly NavItem[] = [
   { href: '/account', label: 'Overview', exact: true },
   { href: '/account/orders', label: 'Orders' },
+  { href: '/account/notifications', label: 'Notifications' },
   { href: '/account/profile', label: 'Profile' },
   { href: '/account/addresses', label: 'Addresses' },
   { href: '/wishlist', label: 'Wishlist' },
@@ -27,9 +29,23 @@ function isActive(pathname: string, item: NavItem) {
 const ROW_BASE =
   'flex w-full items-center border-b border-line px-4 py-3 text-left text-[14px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink';
 
+const NOTIFICATIONS_HREF = '/account/notifications';
+
+function NavBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="ml-auto inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-brand px-1.5 text-[11px] font-bold leading-none text-white">
+      {count > 99 ? '99+' : count}
+      <span className="sr-only"> unread</span>
+    </span>
+  );
+}
+
 function AccountNav() {
   const pathname = usePathname();
   const { logout } = useAuth();
+  const { unreadCount, isHydrated: notificationsHydrated } = useNotifications();
+  const badgeFor = (item: NavItem) => (item.href === NOTIFICATIONS_HREF && notificationsHydrated ? unreadCount : 0);
 
   return (
     <aside className="lg:w-60 lg:shrink-0">
@@ -49,6 +65,7 @@ function AccountNav() {
               }`}
             >
               {item.label}
+              <NavBadge count={badgeFor(item)} />
             </Link>
           );
         })}
@@ -71,11 +88,12 @@ function AccountNav() {
                 key={item.href}
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
-                className={`-mb-px whitespace-nowrap border-b-2 px-3 py-3 text-[13px] uppercase tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink ${
+                className={`-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-3 text-[13px] uppercase tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink ${
                   active ? 'border-brand font-bold text-brand' : 'border-transparent font-bold text-ink-3 hover:text-ink'
                 }`}
               >
                 {item.label}
+                <NavBadge count={badgeFor(item)} />
               </Link>
             );
           })}

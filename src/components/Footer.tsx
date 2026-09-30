@@ -23,15 +23,15 @@ const MY_ACCOUNT = [
 ];
 
 const CUSTOMER_POLICIES = [
-  'Contact Us',
-  'FAQ',
-  'T&C',
-  'Track Orders',
-  'Shipping',
-  'Cancellation',
-  'Returns',
-  'Privacy policy',
-].map((label) => ({ href: '#', label }));
+  { href: '#', label: 'Contact Us' },
+  { href: '#', label: 'FAQ' },
+  { href: '#', label: 'T&C' },
+  { href: '/track', label: 'Track Orders' },
+  { href: '#', label: 'Shipping' },
+  { href: '#', label: 'Cancellation' },
+  { href: '#', label: 'Returns' },
+  { href: '#', label: 'Privacy policy' },
+];
 
 const POPULAR_SEARCHES = [
   'Headphones',

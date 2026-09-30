@@ -1,4 +1,5 @@
 import { DEFAULT_SORT, isProductSort, parseProductQuery, type ProductQuery } from '@/lib/api';
+import type { CategoryRecord } from '@/lib/mockTypes';
 import type { ProductSort } from '@/lib/types';
 
 export interface FilterValues {
@@ -63,8 +64,16 @@ export function toCatalogFilters(query: ProductQuery): CatalogFilters {
   };
 }
 
-export function parseCatalogFilters(raw: URLSearchParams | Record<string, string | string[] | undefined>): CatalogFilters {
-  return toCatalogFilters(parseProductQuery(raw));
+/**
+ * Parses URL params into filters. `?category=` is validated against `categories`; pass the
+ * effective (admin-edited) catalog client-side so admin-created categories are not dropped.
+ * Without it the base mock categories are used (what the server knows).
+ */
+export function parseCatalogFilters(
+  raw: URLSearchParams | Record<string, string | string[] | undefined>,
+  categories?: readonly Pick<CategoryRecord, 'slug'>[],
+): CatalogFilters {
+  return toCatalogFilters(categories ? parseProductQuery(raw, categories) : parseProductQuery(raw));
 }
 
 export function pickFilterValues(filters: CatalogFilters): FilterValues {
