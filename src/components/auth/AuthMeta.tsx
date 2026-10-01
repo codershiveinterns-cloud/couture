@@ -5,8 +5,13 @@ export function TermsNote() {
   return (
     <p className="text-[12px] leading-relaxed text-ink-3">
       By continuing, I agree to the{' '}
-      <span className="font-bold text-brand">Terms of Use</span> &amp;{' '}
-      <span className="font-bold text-brand">Privacy Policy</span>
+      <Link href="/terms" target="_blank" rel="noopener" className="font-bold text-brand hover:underline">
+        Terms of Use
+      </Link>{' '}
+      &amp;{' '}
+      <Link href="/privacy" target="_blank" rel="noopener" className="font-bold text-brand hover:underline">
+        Privacy Policy
+      </Link>
     </p>
   );
 }

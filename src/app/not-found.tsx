@@ -34,6 +34,12 @@ export default function NotFound() {
           Shop all
         </Link>
       </div>
+      <p className="mt-6 text-[13px] text-ink-3">
+        Think this is a mistake?{' '}
+        <Link href="/contact" className="font-bold text-brand hover:underline">
+          Contact us
+        </Link>
+      </p>
     </div>
   );
 }

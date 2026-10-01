@@ -12,6 +12,7 @@ const ONLINE_SHOPPING = [
   { href: '/categories/beauty-and-personal-care', label: 'Beauty & Personal Care' },
   { href: '/categories/sports-and-outdoors', label: 'Sports & Outdoors' },
   { href: '/products', label: 'All Products' },
+  { href: '/about', label: 'About us' },
 ];
 
 const MY_ACCOUNT = [
@@ -23,14 +24,14 @@ const MY_ACCOUNT = [
 ];
 
 const CUSTOMER_POLICIES = [
-  { href: '#', label: 'Contact Us' },
-  { href: '#', label: 'FAQ' },
-  { href: '#', label: 'T&C' },
+  { href: '/contact', label: 'Contact Us' },
+  { href: '/faq', label: 'FAQ' },
+  { href: '/terms', label: 'T&C' },
   { href: '/track', label: 'Track Orders' },
-  { href: '#', label: 'Shipping' },
-  { href: '#', label: 'Cancellation' },
-  { href: '#', label: 'Returns' },
-  { href: '#', label: 'Privacy policy' },
+  { href: '/shipping', label: 'Shipping' },
+  { href: '/cancellation', label: 'Cancellation' },
+  { href: '/returns', label: 'Returns' },
+  { href: '/privacy', label: 'Privacy policy' },
 ];
 
 const POPULAR_SEARCHES = [
@@ -255,7 +256,6 @@ function FooterColumn({ title, links }: { title: string; links: { href: string; 
           <li key={link.label}>
             <Link
               href={link.href}
-              onClick={link.href === '#' ? (e) => e.preventDefault() : undefined}
               className="text-[14px] text-ink-2 transition-colors hover:text-ink"
             >
               {link.label}
